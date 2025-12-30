@@ -1,0 +1,1191 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ui version="4.0">
+ <class>MainWindow</class>
+ <widget class="QMainWindow" name="MainWindow">
+  <property name="geometry">
+   <rect>
+    <x>0</x>
+    <y>0</y>
+    <width>1077</width>
+    <height>540</height>
+   </rect>
+  </property>
+  <property name="windowTitle">
+   <string>JetFyx</string>
+  </property>
+  <property name="toolButtonStyle">
+   <enum>Qt::ToolButtonIconOnly</enum>
+  </property>
+  <widget class="QWidget" name="centralwidget"/>
+  <widget class="QMenuBar" name="menubar">
+   <property name="geometry">
+    <rect>
+     <x>0</x>
+     <y>0</y>
+     <width>1077</width>
+     <height>18</height>
+    </rect>
+   </property>
+   <widget class="QMenu" name="menuFile">
+    <property name="title">
+     <string>File</string>
+    </property>
+    <widget class="QMenu" name="menuNew_Chart">
+     <property name="title">
+      <string>New Chart</string>
+     </property>
+     <property name="toolTipsVisible">
+      <bool>false</bool>
+     </property>
+     <widget class="QMenu" name="menuForex">
+      <property name="title">
+       <string>Forex</string>
+      </property>
+      <addaction name="actionEURUSD_3"/>
+      <addaction name="actionGBPUSD_3"/>
+      <addaction name="actionUSDCHF_2"/>
+      <addaction name="actionUSDJPY_3"/>
+      <addaction name="actionUSDCNH_3"/>
+      <addaction name="actionAUDUSD_3"/>
+      <addaction name="actionNZDUSD"/>
+      <addaction name="actionUSDCAD"/>
+      <addaction name="actionUSDSEK"/>
+     </widget>
+     <widget class="QMenu" name="menuIndexes">
+      <property name="title">
+       <string>Indexes</string>
+      </property>
+      <addaction name="actionSP500m"/>
+     </widget>
+     <widget class="QMenu" name="menuNasdaq">
+      <property name="title">
+       <string>Nasdaq</string>
+      </property>
+      <widget class="QMenu" name="menuStock">
+       <property name="title">
+        <string>Stock</string>
+       </property>
+       <addaction name="actionAMD"/>
+       <addaction name="actionMSFT"/>
+       <addaction name="actionINTC"/>
+       <addaction name="actionNVDA"/>
+      </widget>
+      <addaction name="menuStock"/>
+     </widget>
+     <addaction name="actionEURUSD_2"/>
+     <addaction name="actionGBPUSD_2"/>
+     <addaction name="actionUSDJPY_2"/>
+     <addaction name="actionUSDCNH_2"/>
+     <addaction name="actionAUDUSD_2"/>
+     <addaction name="separator"/>
+     <addaction name="menuForex"/>
+     <addaction name="menuIndexes"/>
+     <addaction name="menuNasdaq"/>
+    </widget>
+    <addaction name="menuNew_Chart"/>
+    <addaction name="actionOpen_Deleted"/>
+    <addaction name="actionProfiles"/>
+    <addaction name="actionClose"/>
+    <addaction name="actionSave"/>
+    <addaction name="actionSave_as_Picture"/>
+    <addaction name="separator"/>
+    <addaction name="actionOpen_Data_Folder"/>
+    <addaction name="separator"/>
+    <addaction name="actionPrint"/>
+    <addaction name="actionPrint_Preview"/>
+    <addaction name="actionPrint_Setup"/>
+    <addaction name="separator"/>
+    <addaction name="actionOpen_an_Account"/>
+    <addaction name="actionDeposit"/>
+    <addaction name="actionWithdrawl"/>
+    <addaction name="actionLogin_to_Trade_Account"/>
+    <addaction name="actionLogin_to_Webtrader"/>
+    <addaction name="actionLogin_to_MQL5_community"/>
+    <addaction name="separator"/>
+    <addaction name="actionExit"/>
+    <addaction name="separator"/>
+    <addaction name="separator"/>
+   </widget>
+   <widget class="QMenu" name="menuView">
+    <property name="title">
+     <string>View</string>
+    </property>
+    <widget class="QMenu" name="menuColors">
+     <property name="title">
+      <string>Colors</string>
+     </property>
+     <addaction name="actionSystem"/>
+     <addaction name="actionLight"/>
+     <addaction name="actionDark"/>
+    </widget>
+    <widget class="QMenu" name="menuToolbars">
+     <property name="title">
+      <string>Toolbars</string>
+     </property>
+     <addaction name="actionStandard"/>
+     <addaction name="actionLine_Studies"/>
+     <addaction name="actionTime_Frames"/>
+    </widget>
+    <widget class="QMenu" name="menuLanguages">
+     <property name="title">
+      <string>Languages</string>
+     </property>
+     <addaction name="actionArabic"/>
+    </widget>
+    <addaction name="menuLanguages"/>
+    <addaction name="menuColors"/>
+    <addaction name="separator"/>
+    <addaction name="menuToolbars"/>
+    <addaction name="actionStatus_Bar"/>
+    <addaction name="actionCharts_Bar"/>
+    <addaction name="separator"/>
+    <addaction name="actionSymbols"/>
+    <addaction name="actionDepth_Of_Market"/>
+    <addaction name="separator"/>
+    <addaction name="actionMarket_Watch"/>
+    <addaction name="actionData_Window"/>
+    <addaction name="actionNavigator"/>
+    <addaction name="actionToolbox"/>
+    <addaction name="actionStratergy_Tester"/>
+    <addaction name="actionCharts"/>
+    <addaction name="actionReports"/>
+    <addaction name="separator"/>
+    <addaction name="actionFull_Screen"/>
+   </widget>
+   <widget class="QMenu" name="menuInsert">
+    <property name="title">
+     <string>Insert</string>
+    </property>
+    <addaction name="actionIndicators"/>
+    <addaction name="actionObjects"/>
+    <addaction name="actionExperts"/>
+    <addaction name="actionScripts"/>
+   </widget>
+   <widget class="QMenu" name="menuCharts">
+    <property name="title">
+     <string>Charts</string>
+    </property>
+    <addaction name="actionDepth_of_Market"/>
+    <addaction name="actionIndicators_List"/>
+    <addaction name="actionObjects_2"/>
+    <addaction name="actionExperts_List"/>
+    <addaction name="separator"/>
+    <addaction name="actionBar_Chart_2"/>
+    <addaction name="actionCandle_Stick"/>
+    <addaction name="actionLine_Chart_2"/>
+    <addaction name="separator"/>
+    <addaction name="actionTime_Frames_2"/>
+    <addaction name="actionTemplates"/>
+    <addaction name="actionGrid"/>
+    <addaction name="actionAuto_Scroll"/>
+    <addaction name="actionCharts_shift"/>
+    <addaction name="separator"/>
+    <addaction name="actionVolumes"/>
+    <addaction name="actionTick_Volumes"/>
+    <addaction name="actionTrade_Levels"/>
+    <addaction name="actionTrade_History"/>
+    <addaction name="separator"/>
+    <addaction name="actionZomm_In"/>
+    <addaction name="actionZoom_out"/>
+    <addaction name="actionstep_by_step"/>
+    <addaction name="separator"/>
+    <addaction name="actionProperties"/>
+   </widget>
+   <widget class="QMenu" name="menuTools">
+    <property name="title">
+     <string>Tools</string>
+    </property>
+    <addaction name="actionNew_Order_2"/>
+    <addaction name="separator"/>
+    <addaction name="actionStratergy_Tester_Agents_management"/>
+    <addaction name="actionMetaQuote_Language_Editor"/>
+    <addaction name="actionTask_Manager"/>
+    <addaction name="actionGlobal_Variables"/>
+    <addaction name="separator"/>
+    <addaction name="actionMQL5_market"/>
+    <addaction name="actionMQL5_signals"/>
+    <addaction name="actionMQL5_Virtual_Hosting"/>
+    <addaction name="separator"/>
+    <addaction name="actionOptions"/>
+   </widget>
+   <widget class="QMenu" name="menuWindows">
+    <property name="title">
+     <string>Windows</string>
+    </property>
+    <addaction name="actionTile_Windows"/>
+    <addaction name="separator"/>
+    <addaction name="actionCascade"/>
+    <addaction name="actionTile_Horizantally"/>
+    <addaction name="actionTile_Verically"/>
+    <addaction name="actionArrange_Icons"/>
+    <addaction name="actionReset_to_Default"/>
+    <addaction name="separator"/>
+    <addaction name="actionResolution"/>
+    <addaction name="separator"/>
+   </widget>
+   <widget class="QMenu" name="menuHelp">
+    <property name="title">
+     <string>Help</string>
+    </property>
+    <addaction name="actionHelp_Topic_s"/>
+    <addaction name="actionWhat_s_New"/>
+    <addaction name="actionMQL5_Telegram_channel"/>
+    <addaction name="actionVideo_Guides"/>
+    <addaction name="separator"/>
+    <addaction name="actionMQL5_Webtrader"/>
+    <addaction name="actionMQL5_Docummentation"/>
+   </widget>
+   <addaction name="menuFile"/>
+   <addaction name="menuView"/>
+   <addaction name="menuInsert"/>
+   <addaction name="menuCharts"/>
+   <addaction name="menuTools"/>
+   <addaction name="menuWindows"/>
+   <addaction name="menuHelp"/>
+  </widget>
+  <widget class="QToolBar" name="toolBar">
+   <property name="windowTitle">
+    <string>toolBar</string>
+   </property>
+   <attribute name="toolBarArea">
+    <enum>TopToolBarArea</enum>
+   </attribute>
+   <attribute name="toolBarBreak">
+    <bool>false</bool>
+   </attribute>
+   <addaction name="actionCreate_new_chart"/>
+   <addaction name="actionmanage_profiles"/>
+   <addaction name="actionshow_symbol_list"/>
+   <addaction name="separator"/>
+   <addaction name="actionmeta_quote_languages"/>
+   <addaction name="actionOpen_MQL_5_Market"/>
+   <addaction name="actionOpen_MQL5_Signal"/>
+   <addaction name="actionVirtual_Hosting"/>
+   <addaction name="actionRegister_Account_to_trade"/>
+   <addaction name="actionalgo_trading"/>
+   <addaction name="actionNew_Order"/>
+   <addaction name="separator"/>
+   <addaction name="actionBar_Chart"/>
+   <addaction name="actionCandle_Chart"/>
+   <addaction name="actionLine_Chart"/>
+   <addaction name="separator"/>
+   <addaction name="actionZoom_in"/>
+   <addaction name="actionZoom_Out"/>
+   <addaction name="actionArrange_windows_as_non_overlpping_Style"/>
+   <addaction name="separator"/>
+   <addaction name="actionmove_to_end_of_chart"/>
+   <addaction name="actionshift_end_of_chart_from_right_border"/>
+   <addaction name="separator"/>
+   <addaction name="actionsave_active_chart_as_screenshot"/>
+   <addaction name="actioncursor"/>
+   <addaction name="actioncrosshair"/>
+   <addaction name="separator"/>
+   <addaction name="actiondraw_vertical_line"/>
+   <addaction name="actiondraw_horizantal_line"/>
+   <addaction name="actiondraw_trend_line"/>
+   <addaction name="actiondraw_equidistant"/>
+   <addaction name="actiondraw_fibonacci_pattern"/>
+   <addaction name="actionText"/>
+   <addaction name="actiondraw_arrow"/>
+   <addaction name="separator"/>
+   <addaction name="action1_Minute"/>
+   <addaction name="actionsearch"/>
+   <addaction name="actionMQL5_Community"/>
+   <addaction name="actionLevel"/>
+  </widget>
+  <widget class="QStatusBar" name="statusBar"/>
+  <action name="actionOpen_Deleted">
+   <property name="text">
+    <string>Open Deleted</string>
+   </property>
+  </action>
+  <action name="actionProfiles">
+   <property name="text">
+    <string>Profiles</string>
+   </property>
+  </action>
+  <action name="actionClose">
+   <property name="text">
+    <string>Close</string>
+   </property>
+  </action>
+  <action name="actionSave">
+   <property name="icon">
+    <iconset>
+     <normaloff>:/Main_Window/Icons/Save.png</normaloff>:/Main_Window/Icons/Save.png</iconset>
+   </property>
+   <property name="text">
+    <string>Save</string>
+   </property>
+  </action>
+  <action name="actionSave_as_Picture">
+   <property name="icon">
+    <iconset>
+     <normaloff>:/Main_Window/Icons/Save_as_image.png</normaloff>:/Main_Window/Icons/Save_as_image.png</iconset>
+   </property>
+   <property name="text">
+    <string>Save as Picture</string>
+   </property>
+  </action>
+  <action name="actionOpen_Data_Folder">
+   <property name="icon">
+    <iconset>
+     <normaloff>:/Main_Window/Icons/Open_Data_Folder.png</normaloff>:/Main_Window/Icons/Open_Data_Folder.png</iconset>
+   </property>
+   <property name="text">
+    <string>Open Data Folder</string>
+   </property>
+  </action>
+  <action name="actionPrint">
+   <property name="icon">
+    <iconset>
+     <normaloff>:/Main_Window/Icons/Print.png</normaloff>:/Main_Window/Icons/Print.png</iconset>
+   </property>
+   <property name="text">
+    <string>Print</string>
+   </property>
+  </action>
+  <action name="actionPrint_Preview">
+   <property name="icon">
+    <iconset>
+     <normaloff>:/Main_Window/Icons/Print_Preview.png</normaloff>:/Main_Window/Icons/Print_Preview.png</iconset>
+   </property>
+   <property name="text">
+    <string>Print Preview</string>
+   </property>
+  </action>
+  <action name="actionPrint_Setup">
+   <property name="icon">
+    <iconset>
+     <normaloff>:/Main_Window/Icons/Print_setup.png</normaloff>:/Main_Window/Icons/Print_setup.png</iconset>
+   </property>
+   <property name="text">
+    <string>Print Setup</string>
+   </property>
+  </action>
+  <action name="actionOpen_an_Account">
+   <property name="icon">
+    <iconset>
+     <normaloff>:/Main_Window/Icons/Open_an_account.png</normaloff>:/Main_Window/Icons/Open_an_account.png</iconset>
+   </property>
+   <property name="text">
+    <string>Open an Account</string>
+   </property>
+  </action>
+  <action name="actionDeposit">
+   <property name="icon">
+    <iconset>
+     <normaloff>:/Main_Window/Icons/Deposit.png</normaloff>:/Main_Window/Icons/Deposit.png</iconset>
+   </property>
+   <property name="text">
+    <string>Deposit</string>
+   </property>
+  </action>
+  <action name="actionWithdrawl">
+   <property name="icon">
+    <iconset>
+     <normaloff>:/Main_Window/Icons/Withdrawal.png</normaloff>:/Main_Window/Icons/Withdrawal.png</iconset>
+   </property>
+   <property name="text">
+    <string>Withdrawl</string>
+   </property>
+  </action>
+  <action name="actionLogin_to_Trade_Account">
+   <property name="icon">
+    <iconset>
+     <normaloff>:/Main_Window/Icons/Login_to_trade.png</normaloff>:/Main_Window/Icons/Login_to_trade.png</iconset>
+   </property>
+   <property name="text">
+    <string>Login to Trade Account</string>
+   </property>
+  </action>
+  <action name="actionLogin_to_Webtrader">
+   <property name="icon">
+    <iconset>
+     <normaloff>:/Main_Window/Icons/Web_trader.png</normaloff>:/Main_Window/Icons/Web_trader.png</iconset>
+   </property>
+   <property name="text">
+    <string>Login to Web Trader</string>
+   </property>
+  </action>
+  <action name="actionLogin_to_MQL5_community">
+   <property name="icon">
+    <iconset>
+     <normaloff>:/Main_Window/Icons/Community.png</normaloff>:/Main_Window/Icons/Community.png</iconset>
+   </property>
+   <property name="text">
+    <string>Login to MQL5.community</string>
+   </property>
+  </action>
+  <action name="actionExit">
+   <property name="icon">
+    <iconset>
+     <normaloff>:/Main_Window/Icons/Exit.png</normaloff>:/Main_Window/Icons/Exit.png</iconset>
+   </property>
+   <property name="text">
+    <string>Exit</string>
+   </property>
+  </action>
+  <action name="actionEURUSD">
+   <property name="text">
+    <string>EURUSD</string>
+   </property>
+  </action>
+  <action name="actionGBPUSD">
+   <property name="text">
+    <string>GBPUSD</string>
+   </property>
+  </action>
+  <action name="actionUSDCHF">
+   <property name="text">
+    <string>USDCHF</string>
+   </property>
+  </action>
+  <action name="actionUSDJPY">
+   <property name="text">
+    <string>USDJPY</string>
+   </property>
+  </action>
+  <action name="actionUSDCNH">
+   <property name="text">
+    <string>USDCNH</string>
+   </property>
+  </action>
+  <action name="actionAUDUSD">
+   <property name="text">
+    <string>AUDUSD</string>
+   </property>
+  </action>
+  <action name="actionForex">
+   <property name="text">
+    <string>Forex</string>
+   </property>
+  </action>
+  <action name="actionEURUSD_2">
+   <property name="text">
+    <string>EURUSD</string>
+   </property>
+  </action>
+  <action name="actionGBPUSD_2">
+   <property name="text">
+    <string>GBPUSD</string>
+   </property>
+  </action>
+  <action name="actionUSDJPY_2">
+   <property name="text">
+    <string>USDJPY</string>
+   </property>
+  </action>
+  <action name="actionUSDCNH_2">
+   <property name="text">
+    <string>USDCNH</string>
+   </property>
+  </action>
+  <action name="actionAUDUSD_2">
+   <property name="text">
+    <string>AUDUSD</string>
+   </property>
+  </action>
+  <action name="actionEURUSD_3">
+   <property name="text">
+    <string>EURUSD</string>
+   </property>
+  </action>
+  <action name="actionGBPUSD_3">
+   <property name="text">
+    <string>GBPUSD</string>
+   </property>
+  </action>
+  <action name="actionUSDCHF_2">
+   <property name="text">
+    <string>USDCHF</string>
+   </property>
+  </action>
+  <action name="actionUSDJPY_3">
+   <property name="text">
+    <string>USDJPY</string>
+   </property>
+  </action>
+  <action name="actionUSDCNH_3">
+   <property name="text">
+    <string>USDCNH</string>
+   </property>
+  </action>
+  <action name="actionAUDUSD_3">
+   <property name="text">
+    <string>AUDUSD</string>
+   </property>
+  </action>
+  <action name="actionNZDUSD">
+   <property name="text">
+    <string>NZDUSD</string>
+   </property>
+  </action>
+  <action name="actionUSDCAD">
+   <property name="text">
+    <string>USDCAD</string>
+   </property>
+  </action>
+  <action name="actionUSDSEK">
+   <property name="text">
+    <string>USDSEK</string>
+   </property>
+  </action>
+  <action name="actionSP500m">
+   <property name="text">
+    <string>SP500m</string>
+   </property>
+  </action>
+  <action name="actionAMD">
+   <property name="text">
+    <string>AMD</string>
+   </property>
+  </action>
+  <action name="actionMSFT">
+   <property name="text">
+    <string>MSFT</string>
+   </property>
+  </action>
+  <action name="actionINTC">
+   <property name="text">
+    <string>INTC</string>
+   </property>
+  </action>
+  <action name="actionNVDA">
+   <property name="text">
+    <string>NVDA</string>
+   </property>
+  </action>
+  <action name="actionStatus_Bar">
+   <property name="text">
+    <string>Status Bar</string>
+   </property>
+  </action>
+  <action name="actionCharts_Bar">
+   <property name="text">
+    <string>Charts Bar</string>
+   </property>
+  </action>
+  <action name="actionSymbols">
+   <property name="text">
+    <string>Symbols</string>
+   </property>
+  </action>
+  <action name="actionDepth_Of_Market">
+   <property name="text">
+    <string>Depth Of Market</string>
+   </property>
+  </action>
+  <action name="actionMarket_Watch">
+   <property name="text">
+    <string>Market Watch</string>
+   </property>
+  </action>
+  <action name="actionData_Window">
+   <property name="text">
+    <string>Data Window</string>
+   </property>
+  </action>
+  <action name="actionNavigator">
+   <property name="text">
+    <string>Navigator</string>
+   </property>
+  </action>
+  <action name="actionToolbox">
+   <property name="text">
+    <string>Toolbox</string>
+   </property>
+  </action>
+  <action name="actionStratergy_Tester">
+   <property name="text">
+    <string>Stratergy Tester</string>
+   </property>
+  </action>
+  <action name="actionCharts">
+   <property name="text">
+    <string>Charts</string>
+   </property>
+  </action>
+  <action name="actionReports">
+   <property name="text">
+    <string>Reports</string>
+   </property>
+  </action>
+  <action name="actionFull_Screen">
+   <property name="text">
+    <string>Full Screen</string>
+   </property>
+  </action>
+  <action name="actionSystem">
+   <property name="text">
+    <string>System</string>
+   </property>
+  </action>
+  <action name="actionLight">
+   <property name="text">
+    <string>Light</string>
+   </property>
+  </action>
+  <action name="actionDark">
+   <property name="text">
+    <string>Dark</string>
+   </property>
+  </action>
+  <action name="actionStandard">
+   <property name="text">
+    <string>Standard</string>
+   </property>
+  </action>
+  <action name="actionLine_Studies">
+   <property name="text">
+    <string>Line Studies</string>
+   </property>
+  </action>
+  <action name="actionTime_Frames">
+   <property name="text">
+    <string>Time Frames</string>
+   </property>
+  </action>
+  <action name="actionArabic">
+   <property name="text">
+    <string>Arabic</string>
+   </property>
+  </action>
+  <action name="actionCreate_new_chart">
+   <property name="icon">
+    <iconset>
+     <normaloff>:/Main_Window/Icons/chart.png</normaloff>:/Main_Window/Icons/chart.png</iconset>
+   </property>
+   <property name="text">
+    <string>Create new chart</string>
+   </property>
+  </action>
+  <action name="actionmanage_profiles">
+   <property name="icon">
+    <iconset>
+     <normaloff>:/Main_Window/Icons/manage_profiles.png</normaloff>:/Main_Window/Icons/manage_profiles.png</iconset>
+   </property>
+   <property name="text">
+    <string>manage profiles</string>
+   </property>
+  </action>
+  <action name="actionshow_symbol_list">
+   <property name="checkable">
+    <bool>true</bool>
+   </property>
+   <property name="icon">
+    <iconset>
+     <normalon>:/Main_Window/Icons/show_symbol.png</normalon>
+    </iconset>
+   </property>
+   <property name="text">
+    <string>show symbol list</string>
+   </property>
+   <property name="shortcut">
+    <string>Ctrl+U</string>
+   </property>
+  </action>
+  <action name="actionmeta_quote_languages">
+   <property name="icon">
+    <iconset>
+     <normalon>:/Main_Window/Icons/language_editor.png</normalon>
+    </iconset>
+   </property>
+   <property name="text">
+    <string>meta quote languages</string>
+   </property>
+  </action>
+  <action name="actionOpen_MQL_5_Market">
+   <property name="icon">
+    <iconset>
+     <normalon>:/Main_Window/Icons/market.png</normalon>
+    </iconset>
+   </property>
+   <property name="text">
+    <string>Open MQL 5 Market</string>
+   </property>
+  </action>
+  <action name="actionOpen_MQL5_Signal">
+   <property name="icon">
+    <iconset>
+     <normaloff>:/Main_Window/Icons/signals.png</normaloff>:/Main_Window/Icons/signals.png</iconset>
+   </property>
+   <property name="text">
+    <string>Open MQL5 Signal</string>
+   </property>
+  </action>
+  <action name="actionVirtual_Hosting">
+   <property name="icon">
+    <iconset>
+     <normaloff>:/Main_Window/Icons/virtual_hosting.png</normaloff>:/Main_Window/Icons/virtual_hosting.png</iconset>
+   </property>
+   <property name="text">
+    <string>Virtual Hosting</string>
+   </property>
+  </action>
+  <action name="actionRegister_Account_to_trade">
+   <property name="icon">
+    <iconset>
+     <normaloff>:/Main_Window/Icons/register_account.png</normaloff>:/Main_Window/Icons/register_account.png</iconset>
+   </property>
+   <property name="text">
+    <string>Register Account to trade</string>
+   </property>
+  </action>
+  <action name="actionalgo_trading">
+   <property name="icon">
+    <iconset>
+     <selectedon>:/Main_Window/Icons/allow_or_prohibit_trading.png</selectedon>
+    </iconset>
+   </property>
+   <property name="text">
+    <string>algo trading</string>
+   </property>
+  </action>
+  <action name="actionNew_Order">
+   <property name="icon">
+    <iconset>
+     <normaloff>:/Main_Window/Icons/new_order.png</normaloff>:/Main_Window/Icons/new_order.png</iconset>
+   </property>
+   <property name="text">
+    <string>New Order</string>
+   </property>
+  </action>
+  <action name="actionBar_Chart">
+   <property name="icon">
+    <iconset>
+     <normaloff>:/Main_Window/Icons/bar_chart.png</normaloff>:/Main_Window/Icons/bar_chart.png</iconset>
+   </property>
+   <property name="text">
+    <string>Bar Chart</string>
+   </property>
+  </action>
+  <action name="actionCandle_Chart">
+   <property name="icon">
+    <iconset>
+     <normaloff>:/Main_Window/Icons/candle_chart.png</normaloff>:/Main_Window/Icons/candle_chart.png</iconset>
+   </property>
+   <property name="text">
+    <string>Candle Chart</string>
+   </property>
+  </action>
+  <action name="actionLine_Chart">
+   <property name="icon">
+    <iconset>
+     <normaloff>:/Main_Window/Icons/line_chart.png</normaloff>:/Main_Window/Icons/line_chart.png</iconset>
+   </property>
+   <property name="text">
+    <string>Line Chart</string>
+   </property>
+  </action>
+  <action name="actionZoom_in">
+   <property name="icon">
+    <iconset>
+     <normaloff>:/Main_Window/Icons/zoom_in.png</normaloff>:/Main_Window/Icons/zoom_in.png</iconset>
+   </property>
+   <property name="text">
+    <string>Zoom in</string>
+   </property>
+  </action>
+  <action name="actionZoom_Out">
+   <property name="icon">
+    <iconset>
+     <normaloff>:/Main_Window/Icons/zoom_out.png</normaloff>:/Main_Window/Icons/zoom_out.png</iconset>
+   </property>
+   <property name="text">
+    <string>Zoom Out</string>
+   </property>
+  </action>
+  <action name="actionArrange_windows_as_non_overlpping_Style">
+   <property name="icon">
+    <iconset>
+     <normaloff>:/Main_Window/Icons/arrange_windows.png</normaloff>:/Main_Window/Icons/arrange_windows.png</iconset>
+   </property>
+   <property name="text">
+    <string>Arrange windows as non overlpping Style</string>
+   </property>
+   <property name="shortcut">
+    <string>Alt+R</string>
+   </property>
+  </action>
+  <action name="actionmove_to_end_of_chart">
+   <property name="icon">
+    <iconset>
+     <normaloff>:/Main_Window/Icons/move_to_end_of_chart.png</normaloff>:/Main_Window/Icons/move_to_end_of_chart.png</iconset>
+   </property>
+   <property name="text">
+    <string>move to end of chart</string>
+   </property>
+  </action>
+  <action name="actionshift_end_of_chart_from_right_border">
+   <property name="icon">
+    <iconset>
+     <normaloff>:/Main_Window/Icons/shift_end_of_chart_from_right_border.png</normaloff>:/Main_Window/Icons/shift_end_of_chart_from_right_border.png</iconset>
+   </property>
+   <property name="text">
+    <string>shift end of chart from right border</string>
+   </property>
+  </action>
+  <action name="actionsave_active_chart_as_screenshot">
+   <property name="icon">
+    <iconset>
+     <normaloff>:/Main_Window/Icons/save_active_chart.png</normaloff>:/Main_Window/Icons/save_active_chart.png</iconset>
+   </property>
+   <property name="text">
+    <string>save active chart as screenshot</string>
+   </property>
+  </action>
+  <action name="actioncursor">
+   <property name="icon">
+    <iconset>
+     <normaloff>:/Main_Window/Icons/cursor.png</normaloff>:/Main_Window/Icons/cursor.png</iconset>
+   </property>
+   <property name="text">
+    <string>cursor</string>
+   </property>
+  </action>
+  <action name="actioncrosshair">
+   <property name="icon">
+    <iconset>
+     <normaloff>:/Main_Window/Icons/cross_hair.png</normaloff>:/Main_Window/Icons/cross_hair.png</iconset>
+   </property>
+   <property name="text">
+    <string>crosshair</string>
+   </property>
+  </action>
+  <action name="actiondraw_vertical_line">
+   <property name="icon">
+    <iconset>
+     <normaloff>:/Main_Window/Icons/vertical_line.png</normaloff>:/Main_Window/Icons/vertical_line.png</iconset>
+   </property>
+   <property name="text">
+    <string>draw vertical line</string>
+   </property>
+  </action>
+  <action name="actiondraw_horizantal_line">
+   <property name="icon">
+    <iconset>
+     <normaloff>:/Main_Window/Icons/horizantal_line.png</normaloff>:/Main_Window/Icons/horizantal_line.png</iconset>
+   </property>
+   <property name="text">
+    <string>draw horizantal line</string>
+   </property>
+  </action>
+  <action name="actiondraw_trend_line">
+   <property name="icon">
+    <iconset>
+     <normaloff>:/Main_Window/Icons/trend_line.png</normaloff>:/Main_Window/Icons/trend_line.png</iconset>
+   </property>
+   <property name="text">
+    <string>draw trend line</string>
+   </property>
+  </action>
+  <action name="actiondraw_fibonacci_pattern">
+   <property name="icon">
+    <iconset>
+     <normaloff>:/Main_Window/Icons/pattern.png</normaloff>:/Main_Window/Icons/pattern.png</iconset>
+   </property>
+   <property name="text">
+    <string>draw fibonacci pattern</string>
+   </property>
+  </action>
+  <action name="actionText">
+   <property name="icon">
+    <iconset>
+     <normaloff>:/Main_Window/Icons/text.png</normaloff>:/Main_Window/Icons/text.png</iconset>
+   </property>
+   <property name="text">
+    <string>Text</string>
+   </property>
+  </action>
+  <action name="actiondraw_arrow">
+   <property name="icon">
+    <iconset>
+     <normaloff>:/Main_Window/Icons/draw_shapes.png</normaloff>:/Main_Window/Icons/draw_shapes.png</iconset>
+   </property>
+   <property name="text">
+    <string>draw arrow</string>
+   </property>
+  </action>
+  <action name="actiondraw_equidistant">
+   <property name="icon">
+    <iconset>
+     <normaloff>:/Main_Window/Icons/equidistant_channel.png</normaloff>:/Main_Window/Icons/equidistant_channel.png</iconset>
+   </property>
+   <property name="text">
+    <string>draw equidistant</string>
+   </property>
+  </action>
+  <action name="action1_Minute">
+   <property name="icon">
+    <iconset>
+     <normaloff>:/Main_Window/Icons/time.png</normaloff>:/Main_Window/Icons/time.png</iconset>
+   </property>
+   <property name="text">
+    <string>1 Minute</string>
+   </property>
+  </action>
+  <action name="actionsearch">
+   <property name="icon">
+    <iconset>
+     <normaloff>:/Main_Window/Icons/search.png</normaloff>:/Main_Window/Icons/search.png</iconset>
+   </property>
+   <property name="text">
+    <string>search</string>
+   </property>
+  </action>
+  <action name="actionMQL5_Community">
+   <property name="icon">
+    <iconset>
+     <normaloff>:/Main_Window/Icons/Community.png</normaloff>:/Main_Window/Icons/Community.png</iconset>
+   </property>
+   <property name="text">
+    <string>MQL5.Community</string>
+   </property>
+  </action>
+  <action name="actionLevel">
+   <property name="icon">
+    <iconset>
+     <normaloff>:/Main_Window/Icons/achievment.png</normaloff>:/Main_Window/Icons/achievment.png</iconset>
+   </property>
+   <property name="text">
+    <string>Level</string>
+   </property>
+  </action>
+  <action name="actionIndicators">
+   <property name="text">
+    <string>Indicators</string>
+   </property>
+  </action>
+  <action name="actionObjects">
+   <property name="text">
+    <string>Objects</string>
+   </property>
+  </action>
+  <action name="actionExperts">
+   <property name="text">
+    <string>Experts</string>
+   </property>
+  </action>
+  <action name="actionScripts">
+   <property name="text">
+    <string>Scripts</string>
+   </property>
+  </action>
+  <action name="actionDepth_of_Market">
+   <property name="text">
+    <string>Depth of Market</string>
+   </property>
+  </action>
+  <action name="actionIndicators_List">
+   <property name="text">
+    <string>Indicators List</string>
+   </property>
+  </action>
+  <action name="actionObjects_2">
+   <property name="text">
+    <string>Objects</string>
+   </property>
+  </action>
+  <action name="actionExperts_List">
+   <property name="text">
+    <string>Experts List</string>
+   </property>
+  </action>
+  <action name="actionBar_Chart_2">
+   <property name="text">
+    <string>Bar Chart</string>
+   </property>
+  </action>
+  <action name="actionCandle_Stick">
+   <property name="text">
+    <string>Candle Stick</string>
+   </property>
+  </action>
+  <action name="actionLine_Chart_2">
+   <property name="text">
+    <string>Line Chart</string>
+   </property>
+  </action>
+  <action name="actionTime_Frames_2">
+   <property name="text">
+    <string>Time Frames</string>
+   </property>
+  </action>
+  <action name="actionTemplates">
+   <property name="text">
+    <string>Templates</string>
+   </property>
+  </action>
+  <action name="actionGrid">
+   <property name="text">
+    <string>Grid</string>
+   </property>
+  </action>
+  <action name="actionAuto_Scroll">
+   <property name="text">
+    <string>Auto Scroll</string>
+   </property>
+  </action>
+  <action name="actionCharts_shift">
+   <property name="text">
+    <string>Charts shift</string>
+   </property>
+  </action>
+  <action name="actionVolumes">
+   <property name="text">
+    <string>Volumes</string>
+   </property>
+  </action>
+  <action name="actionTick_Volumes">
+   <property name="text">
+    <string>Tick Volumes</string>
+   </property>
+  </action>
+  <action name="actionTrade_Levels">
+   <property name="text">
+    <string>Trade Levels</string>
+   </property>
+  </action>
+  <action name="actionTrade_History">
+   <property name="text">
+    <string>Trade History</string>
+   </property>
+  </action>
+  <action name="actionZomm_In">
+   <property name="text">
+    <string>Zomm In</string>
+   </property>
+  </action>
+  <action name="actionZoom_out">
+   <property name="text">
+    <string>Zoom out</string>
+   </property>
+  </action>
+  <action name="actionstep_by_step">
+   <property name="text">
+    <string>step by step</string>
+   </property>
+  </action>
+  <action name="actionProperties">
+   <property name="text">
+    <string>Properties</string>
+   </property>
+  </action>
+  <action name="actionNew_Order_2">
+   <property name="text">
+    <string>New Order</string>
+   </property>
+  </action>
+  <action name="actionStratergy_Tester_Agents_management">
+   <property name="text">
+    <string>Stratergy Tester Agents Manager</string>
+   </property>
+  </action>
+  <action name="actionMetaQuote_Language_Editor">
+   <property name="text">
+    <string>MetaQuote Language Editor</string>
+   </property>
+  </action>
+  <action name="actionTask_Manager">
+   <property name="text">
+    <string>Task Manager</string>
+   </property>
+  </action>
+  <action name="actionGlobal_Variables">
+   <property name="text">
+    <string>Global Variables</string>
+   </property>
+  </action>
+  <action name="actionMQL5_market">
+   <property name="text">
+    <string>MQL5 Market</string>
+   </property>
+  </action>
+  <action name="actionMQL5_signals">
+   <property name="text">
+    <string>MQL5 Signals</string>
+   </property>
+  </action>
+  <action name="actionMQL5_Virtual_Hosting">
+   <property name="text">
+    <string>MQL5 Virtual Hosting</string>
+   </property>
+  </action>
+  <action name="actionOptions">
+   <property name="text">
+    <string>Options</string>
+   </property>
+  </action>
+  <action name="actionTile_Windows">
+   <property name="text">
+    <string>Tile Windows</string>
+   </property>
+  </action>
+  <action name="actionCascade">
+   <property name="text">
+    <string>Cascade</string>
+   </property>
+  </action>
+  <action name="actionTile_Horizantally">
+   <property name="text">
+    <string>Tile Horizantally</string>
+   </property>
+  </action>
+  <action name="actionTile_Verically">
+   <property name="text">
+    <string>Tile Verically</string>
+   </property>
+  </action>
+  <action name="actionArrange_Icons">
+   <property name="text">
+    <string>Arrange Icons</string>
+   </property>
+  </action>
+  <action name="actionReset_to_Default">
+   <property name="text">
+    <string>Reset to Default</string>
+   </property>
+  </action>
+  <action name="actionResolution">
+   <property name="text">
+    <string>Resolution</string>
+   </property>
+  </action>
+  <action name="actionHelp_Topic_s">
+   <property name="text">
+    <string>Help Topic's</string>
+   </property>
+  </action>
+  <action name="actionWhat_s_New">
+   <property name="text">
+    <string>What's New</string>
+   </property>
+  </action>
+  <action name="actionMQL5_Telegram_channel">
+   <property name="text">
+    <string>MQL5 Telegram channel</string>
+   </property>
+  </action>
+  <action name="actionVideo_Guides">
+   <property name="text">
+    <string>Video Guides</string>
+   </property>
+  </action>
+  <action name="actionMQL5_Webtrader">
+   <property name="text">
+    <string>MQL5 Webtrader</string>
+   </property>
+  </action>
+  <action name="actionMQL5_Docummentation">
+   <property name="text">
+    <string>MQL5 Docummentation</string>
+   </property>
+  </action>
+ </widget>
+ <resources>
+  <include location="Main_Icons.qrc"/>
+  <include location="Icons/Main_Icons.qrc"/>
+ </resources>
+ <connections/>
+</ui>
