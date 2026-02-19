@@ -24,37 +24,43 @@ class Ui_Dialog(object):
     def setupUi(self, Dialog):
         if not Dialog.objectName():
             Dialog.setObjectName(u"Dialog")
-        Dialog.resize(439, 463)
+        Dialog.resize(487, 463)
         self.layoutWidget = QWidget(Dialog)
         self.layoutWidget.setObjectName(u"layoutWidget")
-        self.layoutWidget.setGeometry(QRect(100, 30, 251, 391))
-        self.verticalLayout_3 = QVBoxLayout(self.layoutWidget)
-        self.verticalLayout_3.setObjectName(u"verticalLayout_3")
-        self.verticalLayout_3.setContentsMargins(0, 0, 0, 0)
+        self.layoutWidget.setGeometry(QRect(80, 10, 311, 411))
+        self.verticalLayout_2 = QVBoxLayout(self.layoutWidget)
+        self.verticalLayout_2.setObjectName(u"verticalLayout_2")
+        self.verticalLayout_2.setContentsMargins(0, 0, 0, 0)
+        self.verticalLayout = QVBoxLayout()
+        self.verticalLayout.setObjectName(u"verticalLayout")
         self.lb_logo = QLabel(self.layoutWidget)
         self.lb_logo.setObjectName(u"lb_logo")
         self.lb_logo.setPixmap(QPixmap(u":/Main_Window/Icons/Logo.png"))
         self.lb_logo.setAlignment(Qt.AlignCenter)
 
-        self.verticalLayout_3.addWidget(self.lb_logo)
+        self.verticalLayout.addWidget(self.lb_logo)
+
+        self.verticalSpacer = QSpacerItem(20, 40, QSizePolicy.Policy.Minimum, QSizePolicy.Policy.Expanding)
+
+        self.verticalLayout.addItem(self.verticalSpacer)
+
+
+        self.verticalLayout_2.addLayout(self.verticalLayout)
 
         self.lb_tagline = QLabel(self.layoutWidget)
         self.lb_tagline.setObjectName(u"lb_tagline")
         font = QFont()
-        font.setPointSize(12)
-        font.setBold(True)
+        font.setPointSize(11)
+        font.setBold(False)
         self.lb_tagline.setFont(font)
         self.lb_tagline.setAlignment(Qt.AlignCenter)
 
-        self.verticalLayout_3.addWidget(self.lb_tagline)
+        self.verticalLayout_2.addWidget(self.lb_tagline)
 
         self.live_demo = QHBoxLayout()
         self.live_demo.setObjectName(u"live_demo")
         self.btn_live = QPushButton(self.layoutWidget)
         self.btn_live.setObjectName(u"btn_live")
-        icon = QIcon()
-        icon.addFile(u":/Main_Window/Icons/show_symbol.png", QSize(), QIcon.Mode.Normal, QIcon.State.Off)
-        self.btn_live.setIcon(icon)
         self.btn_live.setCheckable(True)
         self.btn_live.setChecked(True)
 
@@ -62,50 +68,50 @@ class Ui_Dialog(object):
 
         self.btn_demo = QPushButton(self.layoutWidget)
         self.btn_demo.setObjectName(u"btn_demo")
-        icon1 = QIcon()
-        icon1.addFile(u":/Main_Window/Icons/allow_or_prohibit_trading.png", QSize(), QIcon.Mode.Normal, QIcon.State.Off)
-        self.btn_demo.setIcon(icon1)
         self.btn_demo.setCheckable(True)
 
         self.live_demo.addWidget(self.btn_demo)
 
 
-        self.verticalLayout_3.addLayout(self.live_demo)
+        self.verticalLayout_2.addLayout(self.live_demo)
 
-        self.horizontalLayout_2 = QHBoxLayout()
-        self.horizontalLayout_2.setObjectName(u"horizontalLayout_2")
-        self.verticalLayout_2 = QVBoxLayout()
-        self.verticalLayout_2.setObjectName(u"verticalLayout_2")
-        self.lb_email = QLabel(self.layoutWidget)
-        self.lb_email.setObjectName(u"lb_email")
+        self.email_layout = QHBoxLayout()
+        self.email_layout.setObjectName(u"email_layout")
+        self.icon_email = QLabel(self.layoutWidget)
+        self.icon_email.setObjectName(u"icon_email")
+        self.icon_email.setMaximumSize(QSize(24, 24))
+        self.icon_email.setPixmap(QPixmap(u":/Main_Window/Icons/Login_to_trade.png"))
+        self.icon_email.setScaledContents(True)
 
-        self.verticalLayout_2.addWidget(self.lb_email)
+        self.email_layout.addWidget(self.icon_email)
 
-        self.lb_password = QLabel(self.layoutWidget)
-        self.lb_password.setObjectName(u"lb_password")
-
-        self.verticalLayout_2.addWidget(self.lb_password)
-
-
-        self.horizontalLayout_2.addLayout(self.verticalLayout_2)
-
-        self.verticalLayout = QVBoxLayout()
-        self.verticalLayout.setObjectName(u"verticalLayout")
         self.input_email = QLineEdit(self.layoutWidget)
         self.input_email.setObjectName(u"input_email")
+        self.input_email.setMinimumSize(QSize(0, 35))
 
-        self.verticalLayout.addWidget(self.input_email)
+        self.email_layout.addWidget(self.input_email)
+
+
+        self.verticalLayout_2.addLayout(self.email_layout)
+
+        self.password_layout = QHBoxLayout()
+        self.password_layout.setObjectName(u"password_layout")
+        self.icon_password = QLabel(self.layoutWidget)
+        self.icon_password.setObjectName(u"icon_password")
+        self.icon_password.setMaximumSize(QSize(24, 24))
+        self.icon_password.setPixmap(QPixmap(u":/Main_Window/Icons/password.png"))
+        self.icon_password.setScaledContents(True)
+
+        self.password_layout.addWidget(self.icon_password)
 
         self.input_password = QLineEdit(self.layoutWidget)
         self.input_password.setObjectName(u"input_password")
+        self.input_password.setMinimumSize(QSize(0, 35))
 
-        self.verticalLayout.addWidget(self.input_password)
-
-
-        self.horizontalLayout_2.addLayout(self.verticalLayout)
+        self.password_layout.addWidget(self.input_password)
 
 
-        self.verticalLayout_3.addLayout(self.horizontalLayout_2)
+        self.verticalLayout_2.addLayout(self.password_layout)
 
         self.rememberme = QHBoxLayout()
         self.rememberme.setObjectName(u"rememberme")
@@ -120,20 +126,28 @@ class Ui_Dialog(object):
 
         self.lbl_forgot_password = QLabel(self.layoutWidget)
         self.lbl_forgot_password.setObjectName(u"lbl_forgot_password")
+        self.lbl_forgot_password.setCursor(QCursor(Qt.CursorShape.PointingHandCursor))
 
         self.rememberme.addWidget(self.lbl_forgot_password)
 
 
-        self.verticalLayout_3.addLayout(self.rememberme)
+        self.verticalLayout_2.addLayout(self.rememberme)
 
         self.btn_signin = QPushButton(self.layoutWidget)
         self.btn_signin.setObjectName(u"btn_signin")
-        self.btn_signin.setCursor(QCursor(Qt.CursorShape.ArrowCursor))
-        icon2 = QIcon()
-        icon2.addFile(u":/Main_Window/Icons/signin.png", QSize(), QIcon.Mode.Normal, QIcon.State.Off)
-        self.btn_signin.setIcon(icon2)
+        sizePolicy = QSizePolicy(QSizePolicy.Policy.Minimum, QSizePolicy.Policy.Minimum)
+        sizePolicy.setHorizontalStretch(0)
+        sizePolicy.setVerticalStretch(0)
+        sizePolicy.setHeightForWidth(self.btn_signin.sizePolicy().hasHeightForWidth())
+        self.btn_signin.setSizePolicy(sizePolicy)
+        self.btn_signin.setMinimumSize(QSize(0, 24))
+        self.btn_signin.setMaximumSize(QSize(16777215, 12987774))
+        self.btn_signin.setCursor(QCursor(Qt.CursorShape.PointingHandCursor))
+        icon = QIcon()
+        icon.addFile(u":/Main_Window/Icons/signin.png", QSize(), QIcon.Mode.Normal, QIcon.State.Off)
+        self.btn_signin.setIcon(icon)
 
-        self.verticalLayout_3.addWidget(self.btn_signin)
+        self.verticalLayout_2.addWidget(self.btn_signin)
 
         self.horizontalLayout = QHBoxLayout()
         self.horizontalLayout.setObjectName(u"horizontalLayout")
@@ -154,7 +168,7 @@ class Ui_Dialog(object):
         self.horizontalLayout.addWidget(self.lbl_create_account)
 
 
-        self.verticalLayout_3.addLayout(self.horizontalLayout)
+        self.verticalLayout_2.addLayout(self.horizontalLayout)
 
 
         self.retranslateUi(Dialog)
@@ -165,16 +179,16 @@ class Ui_Dialog(object):
     def retranslateUi(self, Dialog):
         Dialog.setWindowTitle(QCoreApplication.translate("Dialog", u"Dialog", None))
         self.lb_logo.setText("")
-        self.lb_tagline.setText(QCoreApplication.translate("Dialog", u"<html><head/><body><p>Your Company Tagline Here</p></body></html>", None))
-        self.btn_live.setText(QCoreApplication.translate("Dialog", u"Live", None))
-        self.btn_demo.setText(QCoreApplication.translate("Dialog", u"Demo", None))
-        self.lb_email.setText(QCoreApplication.translate("Dialog", u"Email :", None))
-        self.lb_password.setText(QCoreApplication.translate("Dialog", u"Password :", None))
+        self.lb_tagline.setText(QCoreApplication.translate("Dialog", u"Trade Smart, Trade Fast", None))
+        self.btn_live.setText(QCoreApplication.translate("Dialog", u"$ Live", None))
+        self.btn_demo.setText(QCoreApplication.translate("Dialog", u"\u25b6 Demo", None))
+        self.icon_email.setText("")
         self.input_email.setText("")
-        self.input_email.setPlaceholderText(QCoreApplication.translate("Dialog", u"john@example.com", None))
-        self.input_password.setPlaceholderText(QCoreApplication.translate("Dialog", u"Enter your password", None))
+        self.input_email.setPlaceholderText(QCoreApplication.translate("Dialog", u"Email or Account Number", None))
+        self.icon_password.setText("")
+        self.input_password.setPlaceholderText(QCoreApplication.translate("Dialog", u"Password", None))
         self.cb_remember_me.setText(QCoreApplication.translate("Dialog", u"Remember me", None))
-        self.lbl_forgot_password.setText(QCoreApplication.translate("Dialog", u"Forgot Password?", None))
+        self.lbl_forgot_password.setText(QCoreApplication.translate("Dialog", u"Forgot password?", None))
         self.btn_signin.setText(QCoreApplication.translate("Dialog", u"Sign In", None))
         self.lb_trading.setText(QCoreApplication.translate("Dialog", u"New to trading?", None))
         self.lbl_create_account.setText(QCoreApplication.translate("Dialog", u"Create Account", None))

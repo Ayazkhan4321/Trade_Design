@@ -1,12 +1,5 @@
 <RCC>
   <qresource prefix="Main_Window">
-    <file>Icons/mail.png</file>
-    <file>Icons/smallest_logo.png</file>
-    <file>Icons/small_logo.png</file>
-    <file>Icons/signin.png</file>
-    <file>Icons/Logo.png</file>
-    <file>Icons/shift_end_of_chart_from_right_border.png</file>
-    <file>Icons/move_to_end_of_chart.png</file>
     <file>Icons/achievment.png</file>
     <file>Icons/allow_or_prohibit_trading.png</file>
     <file>Icons/arrange_windows.png</file>
@@ -25,11 +18,16 @@
     <file>Icons/language_editor.png</file>
     <file>Icons/line_chart.png</file>
     <file>Icons/Login_to_trade.png</file>
+    <file>Icons/Logo.png</file>
+    <file>Icons/mail.png</file>
+    <file>Icons/Main_Icons.qrc</file>
     <file>Icons/manage_profiles.png</file>
     <file>Icons/market.png</file>
+    <file>Icons/move_to_end_of_chart.png</file>
     <file>Icons/new_order.png</file>
     <file>Icons/Open_an_account.png</file>
     <file>Icons/Open_Data_Folder.png</file>
+    <file>Icons/password.png</file>
     <file>Icons/pattern.png</file>
     <file>Icons/Print.png</file>
     <file>Icons/Print_Preview.png</file>
@@ -39,8 +37,12 @@
     <file>Icons/save_active_chart.png</file>
     <file>Icons/Save_as_image.png</file>
     <file>Icons/search.png</file>
+    <file>Icons/shift_end_of_chart_from_right_border.png</file>
     <file>Icons/show_symbol.png</file>
     <file>Icons/signals.png</file>
+    <file>Icons/signin.png</file>
+    <file>Icons/small_logo.png</file>
+    <file>Icons/smallest_logo.png</file>
     <file>Icons/text.png</file>
     <file>Icons/time.png</file>
     <file>Icons/trend_line.png</file>
@@ -48,21 +50,9 @@
     <file>Icons/vertical_line.png</file>
     <file>Icons/virtual_hosting.png</file>
     <file>Icons/Web_trader.png</file>
+    <file>Icons/WhatsApp Image 2026-02-19 at 10.15.23 AM.jpeg</file>
     <file>Icons/Withdrawal.png</file>
     <file>Icons/zoom_in.png</file>
     <file>Icons/zoom_out.png</file>
-    <file>Icons/Exit.png</file>
-    <file>Icons/Login_to_trade.png</file>
-    <file>Icons/Open_an_account.png</file>
-    <file>Icons/Open_Data_Folder.png</file>
-    <file>Icons/Print.png</file>
-    <file>Icons/Print_Preview.png</file>
-    <file>Icons/Save_as_image.png</file>
-    <file>Icons/Print_setup.png</file>
-    <file>Icons/Web_trader.png</file>
-    <file>Icons/Withdrawal.png</file>
-    <file>Icons/Deposit.png</file>
-    <file>Icons/Community.png</file>
-    <file>Icons/Save.png</file>
   </qresource>
 </RCC>

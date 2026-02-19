@@ -25,16 +25,16 @@ class Ui_Forgot_Password(object):
     def setupUi(self, Forgot_Password):
         if not Forgot_Password.objectName():
             Forgot_Password.setObjectName(u"Forgot_Password")
-        Forgot_Password.resize(400, 300)
-        self.layoutWidget = QWidget(Forgot_Password)
-        self.layoutWidget.setObjectName(u"layoutWidget")
-        self.layoutWidget.setGeometry(QRect(40, 50, 331, 221))
-        self.verticalLayout_2 = QVBoxLayout(self.layoutWidget)
+        Forgot_Password.resize(278, 192)
+        self.widget = QWidget(Forgot_Password)
+        self.widget.setObjectName(u"widget")
+        self.widget.setGeometry(QRect(42, 20, 211, 151))
+        self.verticalLayout_2 = QVBoxLayout(self.widget)
         self.verticalLayout_2.setObjectName(u"verticalLayout_2")
         self.verticalLayout_2.setContentsMargins(0, 0, 0, 0)
         self.verticalLayout = QVBoxLayout()
         self.verticalLayout.setObjectName(u"verticalLayout")
-        self.lb_title_reset_password = QLabel(self.layoutWidget)
+        self.lb_title_reset_password = QLabel(self.widget)
         self.lb_title_reset_password.setObjectName(u"lb_title_reset_password")
         font = QFont()
         font.setPointSize(16)
@@ -42,7 +42,7 @@ class Ui_Forgot_Password(object):
 
         self.verticalLayout.addWidget(self.lb_title_reset_password)
 
-        self.lb_desc_line_forgot_pass = QLabel(self.layoutWidget)
+        self.lb_desc_line_forgot_pass = QLabel(self.widget)
         self.lb_desc_line_forgot_pass.setObjectName(u"lb_desc_line_forgot_pass")
         font1 = QFont()
         font1.setPointSize(10)
@@ -56,13 +56,13 @@ class Ui_Forgot_Password(object):
 
         self.horizontalLayout = QHBoxLayout()
         self.horizontalLayout.setObjectName(u"horizontalLayout")
-        self.lb_forgot_password = QLabel(self.layoutWidget)
+        self.lb_forgot_password = QLabel(self.widget)
         self.lb_forgot_password.setObjectName(u"lb_forgot_password")
         self.lb_forgot_password.setPixmap(QPixmap(u":/Main_Window/Icons/mail.png"))
 
         self.horizontalLayout.addWidget(self.lb_forgot_password)
 
-        self.le_forgot_password = QLineEdit(self.layoutWidget)
+        self.le_forgot_password = QLineEdit(self.widget)
         self.le_forgot_password.setObjectName(u"le_forgot_password")
 
         self.horizontalLayout.addWidget(self.le_forgot_password)
@@ -76,12 +76,12 @@ class Ui_Forgot_Password(object):
 
         self.horizontalLayout_2.addItem(self.horizontalSpacer)
 
-        self.pb_cancel = QPushButton(self.layoutWidget)
+        self.pb_cancel = QPushButton(self.widget)
         self.pb_cancel.setObjectName(u"pb_cancel")
 
         self.horizontalLayout_2.addWidget(self.pb_cancel)
 
-        self.pb_send_link = QPushButton(self.layoutWidget)
+        self.pb_send_link = QPushButton(self.widget)
         self.pb_send_link.setObjectName(u"pb_send_link")
 
         self.horizontalLayout_2.addWidget(self.pb_send_link)
@@ -98,7 +98,7 @@ class Ui_Forgot_Password(object):
     def retranslateUi(self, Forgot_Password):
         Forgot_Password.setWindowTitle(QCoreApplication.translate("Forgot_Password", u"Dialog", None))
         self.lb_title_reset_password.setText(QCoreApplication.translate("Forgot_Password", u"Reset Password", None))
-        self.lb_desc_line_forgot_pass.setText(QCoreApplication.translate("Forgot_Password", u"<html><head/><body><p align=\"justify\"><span style=\" color:#ff0000;\">Enter your email or account nomber to recieve a password reset link.</span></p></body></html>", None))
+        self.lb_desc_line_forgot_pass.setText(QCoreApplication.translate("Forgot_Password", u"<html><head/><body><p align=\"justify\"><span style=\" color:#ff0000;\">Enter your email or account number to recieve a password reset link.</span></p></body></html>", None))
         self.lb_forgot_password.setText("")
         self.le_forgot_password.setText("")
         self.le_forgot_password.setPlaceholderText(QCoreApplication.translate("Forgot_Password", u"Email or account number", None))

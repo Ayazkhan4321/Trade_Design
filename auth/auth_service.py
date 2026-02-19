@@ -36,6 +36,8 @@ class AuthResponse(BaseModel):
 
 def _get_session(retries: int = API_RETRIES) -> requests.Session:
     session = requests.Session()
+    # Add User-Agent header required by backend
+    session.headers.update({"User-Agent": "JetFyXDesktop/1.0"})
     backoff = Retry(
         total=retries,
         backoff_factor=0.5,
@@ -48,7 +50,7 @@ def _get_session(retries: int = API_RETRIES) -> requests.Session:
     return session
 
 
-def authenticate(account_type: str, email: str, password: str) -> Tuple[bool, str]:
+def authenticate_full(account_type: str, email: str, password: str) -> Tuple[bool, str, object]:
     """Authenticate with the API.
 
     Returns (success: bool, message: str).
@@ -61,54 +63,92 @@ def authenticate(account_type: str, email: str, password: str) -> Tuple[bool, st
 
     try:
         logger.debug("Hitting API: %s", url)
+        print(f"\n[DEBUG] Request Headers: {dict(session.headers)}")
         response = session.post(url, json=payload, timeout=API_TIMEOUT, verify=API_VERIFY_TLS)
 
-        logger.debug("Status Code: %s", response.status_code)
+        logger.debug("Status Code: %s", getattr(response, 'status_code', None))
+        # Defensive debug printing so test doubles don't raise AttributeError
+        try:
+            print("\n" + "="*60)
+            print("BACKEND LOGIN RESPONSE")
+            print("="*60)
+            print(f"Status Code: {getattr(response, 'status_code', None)}")
+            try:
+                headers_obj = getattr(response, "headers", {}) or {}
+                headers = dict(headers_obj) if isinstance(headers_obj, dict) else dict(headers_obj)
+            except Exception:
+                headers = {}
+            print(f"Headers: {headers}")
+            try:
+                response_json = response.json()
+                print(f"Response Body: {response_json}")
+            except Exception:
+                print(getattr(response, "text", "<no response text>"))
+            print("="*60 + "\n")
+        except Exception:
+            logger.debug("Non-fatal error while printing debug response", exc_info=True)
 
         # ---- HTTP-level errors ----
         if response.status_code == 401:
-            return False, "Invalid email or password."
+            return False, "Invalid email or password.", None
 
         if response.status_code == 400:
-            return False, "Invalid request. Please check inputs."
+            return False, "Invalid request. Please check inputs.", None
 
         if response.status_code >= 500:
-            return False, "Server error. Please try again later."
+            return False, "Server error. Please try again later.", None
 
         if response.status_code != 200:
-            return False, "Unexpected error occurred."
+            return False, "Unexpected error occurred.", None
 
         # ---- Parse & validate response ----
         try:
             payload_json = response.json()
         except ValueError:
             logger.exception("Failed to parse JSON from auth response")
-            return False, "Invalid server response."
+            return False, "Invalid server response.", None
 
         try:
             validated = AuthResponse.parse_obj(payload_json)
         except ValidationError:
             logger.exception("Response schema validation failed")
-            return False, "Invalid server response structure."
+            return False, "Invalid server response structure.", payload_json if isinstance(payload_json, dict) else None
 
+        # Try to get token from response body first
         token = validated.data.token or validated.data.accessToken
+        
+        # If not in body, check cookies (backend sends jwt_token in Set-Cookie header)
+        if not token:
+            cookies = response.cookies
+            token = cookies.get('jwt_token') or cookies.get('access_token')
+        
         if token:
             _store_token(token, email)
-            return True, validated.message or "Login successful"
+            return True, validated.message or "Login successful", payload_json
         else:
-            return False, validated.message or "Login failed."
+            return False, validated.message or "Login failed.", payload_json
 
     except requests.exceptions.Timeout:
         logger.warning("Auth request timed out")
-        return False, "Request timed out. Check your internet."
+        return False, "Request timed out. Check your internet.", None
 
     except requests.exceptions.ConnectionError:
         logger.warning("Unable to connect to auth server")
-        return False, "Unable to connect to server."
+        return False, "Unable to connect to server.", None
 
     except Exception:
         logger.exception("Unexpected error during authentication")
-        return False, "Unexpected error occurred."
+        return False, "Unexpected error occurred.", None
+
+
+def authenticate(account_type: str, email: str, password: str) -> Tuple[bool, str]:
+    """Backward-compatible wrapper that returns (success, message).
+
+    New code should prefer `authenticate_full` to obtain the full response
+    payload (used by account setup and market subscriptions).
+    """
+    success, message, response = authenticate_full(account_type, email, password)
+    return success, message
 
 
 def _store_token(token: str, username: str = "user") -> None:

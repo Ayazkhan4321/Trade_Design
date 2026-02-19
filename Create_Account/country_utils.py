@@ -23,22 +23,43 @@ def format_country_display(country: Dict) -> str:
     return name or ""
 
 
-def normalize_country_data(country: Dict) -> Optional[Dict]:
-    """Return a sanitized country dict with only allowed keys, or None if invalid.
+from typing import Dict, Optional
 
-    This helps guard against unexpected API responses at runtime and keeps the
-    UI code simpler.
+EXPECTED_KEYS = ("name", "dial_code", "code")
+
+
+def normalize_country_data(country: Dict) -> Optional[Dict]:
+    """Normalize API country payload into a strict internal schema.
+
+    API example:
+    {
+      "name": "Afghanistan",
+      "code": "AF",
+      "phoneCode": "+93"
+    }
     """
     if not isinstance(country, dict):
         return None
-    out = {}
-    for k in EXPECTED_KEYS:
-        if k in country and country[k] is not None:
-            out[k] = country[k]
-    # require at least a name or code
-    if "name" not in out and "code" not in out:
+
+    name = country.get("name")
+    code = country.get("code")
+    # Accept multiple possible input keys for phone code/dial_code used across
+    # different API responses or fixtures: 'dial_code', 'dial', or 'phoneCode'.
+    phone_code = country.get("dial_code") or country.get("dial") or country.get("phoneCode")
+
+    if not name and not code:
         return None
-    return out
+
+    out = {
+        "name": name,
+        "code": code.upper() if isinstance(code, str) else None,
+        "dial_code": phone_code if phone_code and str(phone_code).startswith("+")
+        else f"+{phone_code}" if phone_code else None,
+    }
+
+    # Remove None values
+    return {k: v for k, v in out.items() if v}
+
 
 
 def country_has_valid_dial(country: Dict) -> bool:

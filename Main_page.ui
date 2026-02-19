@@ -2,13 +2,25 @@
 <ui version="4.0">
  <class>MainWindow</class>
  <widget class="QMainWindow" name="MainWindow">
+  <property name="enabled">
+   <bool>true</bool>
+  </property>
   <property name="geometry">
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>1077</width>
-    <height>540</height>
+    <width>1406</width>
+    <height>858</height>
    </rect>
+  </property>
+  <property name="mouseTracking">
+   <bool>false</bool>
+  </property>
+  <property name="tabletTracking">
+   <bool>false</bool>
+  </property>
+  <property name="acceptDrops">
+   <bool>false</bool>
   </property>
   <property name="windowTitle">
    <string>JetFyx</string>
@@ -16,14 +28,20 @@
   <property name="toolButtonStyle">
    <enum>Qt::ToolButtonIconOnly</enum>
   </property>
+  <property name="documentMode">
+   <bool>false</bool>
+  </property>
+  <property name="unifiedTitleAndToolBarOnMac">
+   <bool>false</bool>
+  </property>
   <widget class="QWidget" name="centralwidget"/>
   <widget class="QMenuBar" name="menubar">
    <property name="geometry">
     <rect>
      <x>0</x>
      <y>0</y>
-     <width>1077</width>
-     <height>18</height>
+     <width>1406</width>
+     <height>26</height>
     </rect>
    </property>
    <widget class="QMenu" name="menuFile">
@@ -244,6 +262,9 @@
    <addaction name="menuHelp"/>
   </widget>
   <widget class="QToolBar" name="toolBar">
+   <property name="acceptDrops">
+    <bool>true</bool>
+   </property>
    <property name="windowTitle">
     <string>toolBar</string>
    </property>
@@ -292,6 +313,8 @@
    <addaction name="actionsearch"/>
    <addaction name="actionMQL5_Community"/>
    <addaction name="actionLevel"/>
+   <addaction name="separator"/>
+   <addaction name="actiontheme"/>
   </widget>
   <widget class="QStatusBar" name="statusBar"/>
   <action name="actionOpen_Deleted">
@@ -311,7 +334,7 @@
   </action>
   <action name="actionSave">
    <property name="icon">
-    <iconset>
+    <iconset resource="Main_Icons.qrc">
      <normaloff>:/Main_Window/Icons/Save.png</normaloff>:/Main_Window/Icons/Save.png</iconset>
    </property>
    <property name="text">
@@ -320,7 +343,7 @@
   </action>
   <action name="actionSave_as_Picture">
    <property name="icon">
-    <iconset>
+    <iconset resource="Main_Icons.qrc">
      <normaloff>:/Main_Window/Icons/Save_as_image.png</normaloff>:/Main_Window/Icons/Save_as_image.png</iconset>
    </property>
    <property name="text">
@@ -329,7 +352,7 @@
   </action>
   <action name="actionOpen_Data_Folder">
    <property name="icon">
-    <iconset>
+    <iconset resource="Main_Icons.qrc">
      <normaloff>:/Main_Window/Icons/Open_Data_Folder.png</normaloff>:/Main_Window/Icons/Open_Data_Folder.png</iconset>
    </property>
    <property name="text">
@@ -338,7 +361,7 @@
   </action>
   <action name="actionPrint">
    <property name="icon">
-    <iconset>
+    <iconset resource="Main_Icons.qrc">
      <normaloff>:/Main_Window/Icons/Print.png</normaloff>:/Main_Window/Icons/Print.png</iconset>
    </property>
    <property name="text">
@@ -347,7 +370,7 @@
   </action>
   <action name="actionPrint_Preview">
    <property name="icon">
-    <iconset>
+    <iconset resource="Main_Icons.qrc">
      <normaloff>:/Main_Window/Icons/Print_Preview.png</normaloff>:/Main_Window/Icons/Print_Preview.png</iconset>
    </property>
    <property name="text">
@@ -356,7 +379,7 @@
   </action>
   <action name="actionPrint_Setup">
    <property name="icon">
-    <iconset>
+    <iconset resource="Main_Icons.qrc">
      <normaloff>:/Main_Window/Icons/Print_setup.png</normaloff>:/Main_Window/Icons/Print_setup.png</iconset>
    </property>
    <property name="text">
@@ -365,7 +388,7 @@
   </action>
   <action name="actionOpen_an_Account">
    <property name="icon">
-    <iconset>
+    <iconset resource="Main_Icons.qrc">
      <normaloff>:/Main_Window/Icons/Open_an_account.png</normaloff>:/Main_Window/Icons/Open_an_account.png</iconset>
    </property>
    <property name="text">
@@ -374,7 +397,7 @@
   </action>
   <action name="actionDeposit">
    <property name="icon">
-    <iconset>
+    <iconset resource="Main_Icons.qrc">
      <normaloff>:/Main_Window/Icons/Deposit.png</normaloff>:/Main_Window/Icons/Deposit.png</iconset>
    </property>
    <property name="text">
@@ -383,7 +406,7 @@
   </action>
   <action name="actionWithdrawl">
    <property name="icon">
-    <iconset>
+    <iconset resource="Main_Icons.qrc">
      <normaloff>:/Main_Window/Icons/Withdrawal.png</normaloff>:/Main_Window/Icons/Withdrawal.png</iconset>
    </property>
    <property name="text">
@@ -392,7 +415,7 @@
   </action>
   <action name="actionLogin_to_Trade_Account">
    <property name="icon">
-    <iconset>
+    <iconset resource="Main_Icons.qrc">
      <normaloff>:/Main_Window/Icons/Login_to_trade.png</normaloff>:/Main_Window/Icons/Login_to_trade.png</iconset>
    </property>
    <property name="text">
@@ -401,7 +424,7 @@
   </action>
   <action name="actionLogin_to_Webtrader">
    <property name="icon">
-    <iconset>
+    <iconset resource="Main_Icons.qrc">
      <normaloff>:/Main_Window/Icons/Web_trader.png</normaloff>:/Main_Window/Icons/Web_trader.png</iconset>
    </property>
    <property name="text">
@@ -419,7 +442,7 @@
   </action>
   <action name="actionExit">
    <property name="icon">
-    <iconset>
+    <iconset resource="Main_Icons.qrc">
      <normaloff>:/Main_Window/Icons/Exit.png</normaloff>:/Main_Window/Icons/Exit.png</iconset>
    </property>
    <property name="text">
@@ -653,7 +676,7 @@
   </action>
   <action name="actionCreate_new_chart">
    <property name="icon">
-    <iconset>
+    <iconset resource="Main_Icons.qrc">
      <normaloff>:/Main_Window/Icons/chart.png</normaloff>:/Main_Window/Icons/chart.png</iconset>
    </property>
    <property name="text">
@@ -662,7 +685,7 @@
   </action>
   <action name="actionmanage_profiles">
    <property name="icon">
-    <iconset>
+    <iconset resource="Main_Icons.qrc">
      <normaloff>:/Main_Window/Icons/manage_profiles.png</normaloff>:/Main_Window/Icons/manage_profiles.png</iconset>
    </property>
    <property name="text">
@@ -707,7 +730,7 @@
   </action>
   <action name="actionOpen_MQL5_Signal">
    <property name="icon">
-    <iconset>
+    <iconset resource="Main_Icons.qrc">
      <normaloff>:/Main_Window/Icons/signals.png</normaloff>:/Main_Window/Icons/signals.png</iconset>
    </property>
    <property name="text">
@@ -716,7 +739,7 @@
   </action>
   <action name="actionVirtual_Hosting">
    <property name="icon">
-    <iconset>
+    <iconset resource="Main_Icons.qrc">
      <normaloff>:/Main_Window/Icons/virtual_hosting.png</normaloff>:/Main_Window/Icons/virtual_hosting.png</iconset>
    </property>
    <property name="text">
@@ -725,7 +748,7 @@
   </action>
   <action name="actionRegister_Account_to_trade">
    <property name="icon">
-    <iconset>
+    <iconset resource="Main_Icons.qrc">
      <normaloff>:/Main_Window/Icons/register_account.png</normaloff>:/Main_Window/Icons/register_account.png</iconset>
    </property>
    <property name="text">
@@ -744,7 +767,7 @@
   </action>
   <action name="actionNew_Order">
    <property name="icon">
-    <iconset>
+    <iconset resource="Main_Icons.qrc">
      <normaloff>:/Main_Window/Icons/new_order.png</normaloff>:/Main_Window/Icons/new_order.png</iconset>
    </property>
    <property name="text">
@@ -753,7 +776,7 @@
   </action>
   <action name="actionBar_Chart">
    <property name="icon">
-    <iconset>
+    <iconset resource="Main_Icons.qrc">
      <normaloff>:/Main_Window/Icons/bar_chart.png</normaloff>:/Main_Window/Icons/bar_chart.png</iconset>
    </property>
    <property name="text">
@@ -762,7 +785,7 @@
   </action>
   <action name="actionCandle_Chart">
    <property name="icon">
-    <iconset>
+    <iconset resource="Main_Icons.qrc">
      <normaloff>:/Main_Window/Icons/candle_chart.png</normaloff>:/Main_Window/Icons/candle_chart.png</iconset>
    </property>
    <property name="text">
@@ -771,7 +794,7 @@
   </action>
   <action name="actionLine_Chart">
    <property name="icon">
-    <iconset>
+    <iconset resource="Main_Icons.qrc">
      <normaloff>:/Main_Window/Icons/line_chart.png</normaloff>:/Main_Window/Icons/line_chart.png</iconset>
    </property>
    <property name="text">
@@ -780,7 +803,7 @@
   </action>
   <action name="actionZoom_in">
    <property name="icon">
-    <iconset>
+    <iconset resource="Main_Icons.qrc">
      <normaloff>:/Main_Window/Icons/zoom_in.png</normaloff>:/Main_Window/Icons/zoom_in.png</iconset>
    </property>
    <property name="text">
@@ -789,7 +812,7 @@
   </action>
   <action name="actionZoom_Out">
    <property name="icon">
-    <iconset>
+    <iconset resource="Main_Icons.qrc">
      <normaloff>:/Main_Window/Icons/zoom_out.png</normaloff>:/Main_Window/Icons/zoom_out.png</iconset>
    </property>
    <property name="text">
@@ -798,7 +821,7 @@
   </action>
   <action name="actionArrange_windows_as_non_overlpping_Style">
    <property name="icon">
-    <iconset>
+    <iconset resource="Main_Icons.qrc">
      <normaloff>:/Main_Window/Icons/arrange_windows.png</normaloff>:/Main_Window/Icons/arrange_windows.png</iconset>
    </property>
    <property name="text">
@@ -810,7 +833,7 @@
   </action>
   <action name="actionmove_to_end_of_chart">
    <property name="icon">
-    <iconset>
+    <iconset resource="Main_Icons.qrc">
      <normaloff>:/Main_Window/Icons/move_to_end_of_chart.png</normaloff>:/Main_Window/Icons/move_to_end_of_chart.png</iconset>
    </property>
    <property name="text">
@@ -819,7 +842,7 @@
   </action>
   <action name="actionshift_end_of_chart_from_right_border">
    <property name="icon">
-    <iconset>
+    <iconset resource="Main_Icons.qrc">
      <normaloff>:/Main_Window/Icons/shift_end_of_chart_from_right_border.png</normaloff>:/Main_Window/Icons/shift_end_of_chart_from_right_border.png</iconset>
    </property>
    <property name="text">
@@ -828,7 +851,7 @@
   </action>
   <action name="actionsave_active_chart_as_screenshot">
    <property name="icon">
-    <iconset>
+    <iconset resource="Main_Icons.qrc">
      <normaloff>:/Main_Window/Icons/save_active_chart.png</normaloff>:/Main_Window/Icons/save_active_chart.png</iconset>
    </property>
    <property name="text">
@@ -837,7 +860,7 @@
   </action>
   <action name="actioncursor">
    <property name="icon">
-    <iconset>
+    <iconset resource="Main_Icons.qrc">
      <normaloff>:/Main_Window/Icons/cursor.png</normaloff>:/Main_Window/Icons/cursor.png</iconset>
    </property>
    <property name="text">
@@ -846,7 +869,7 @@
   </action>
   <action name="actioncrosshair">
    <property name="icon">
-    <iconset>
+    <iconset resource="Main_Icons.qrc">
      <normaloff>:/Main_Window/Icons/cross_hair.png</normaloff>:/Main_Window/Icons/cross_hair.png</iconset>
    </property>
    <property name="text">
@@ -855,7 +878,7 @@
   </action>
   <action name="actiondraw_vertical_line">
    <property name="icon">
-    <iconset>
+    <iconset resource="Main_Icons.qrc">
      <normaloff>:/Main_Window/Icons/vertical_line.png</normaloff>:/Main_Window/Icons/vertical_line.png</iconset>
    </property>
    <property name="text">
@@ -864,7 +887,7 @@
   </action>
   <action name="actiondraw_horizantal_line">
    <property name="icon">
-    <iconset>
+    <iconset resource="Main_Icons.qrc">
      <normaloff>:/Main_Window/Icons/horizantal_line.png</normaloff>:/Main_Window/Icons/horizantal_line.png</iconset>
    </property>
    <property name="text">
@@ -873,7 +896,7 @@
   </action>
   <action name="actiondraw_trend_line">
    <property name="icon">
-    <iconset>
+    <iconset resource="Main_Icons.qrc">
      <normaloff>:/Main_Window/Icons/trend_line.png</normaloff>:/Main_Window/Icons/trend_line.png</iconset>
    </property>
    <property name="text">
@@ -882,7 +905,7 @@
   </action>
   <action name="actiondraw_fibonacci_pattern">
    <property name="icon">
-    <iconset>
+    <iconset resource="Main_Icons.qrc">
      <normaloff>:/Main_Window/Icons/pattern.png</normaloff>:/Main_Window/Icons/pattern.png</iconset>
    </property>
    <property name="text">
@@ -891,7 +914,7 @@
   </action>
   <action name="actionText">
    <property name="icon">
-    <iconset>
+    <iconset resource="Main_Icons.qrc">
      <normaloff>:/Main_Window/Icons/text.png</normaloff>:/Main_Window/Icons/text.png</iconset>
    </property>
    <property name="text">
@@ -900,7 +923,7 @@
   </action>
   <action name="actiondraw_arrow">
    <property name="icon">
-    <iconset>
+    <iconset resource="Main_Icons.qrc">
      <normaloff>:/Main_Window/Icons/draw_shapes.png</normaloff>:/Main_Window/Icons/draw_shapes.png</iconset>
    </property>
    <property name="text">
@@ -909,7 +932,7 @@
   </action>
   <action name="actiondraw_equidistant">
    <property name="icon">
-    <iconset>
+    <iconset resource="Main_Icons.qrc">
      <normaloff>:/Main_Window/Icons/equidistant_channel.png</normaloff>:/Main_Window/Icons/equidistant_channel.png</iconset>
    </property>
    <property name="text">
@@ -918,7 +941,7 @@
   </action>
   <action name="action1_Minute">
    <property name="icon">
-    <iconset>
+    <iconset resource="Main_Icons.qrc">
      <normaloff>:/Main_Window/Icons/time.png</normaloff>:/Main_Window/Icons/time.png</iconset>
    </property>
    <property name="text">
@@ -927,7 +950,7 @@
   </action>
   <action name="actionsearch">
    <property name="icon">
-    <iconset>
+    <iconset resource="Main_Icons.qrc">
      <normaloff>:/Main_Window/Icons/search.png</normaloff>:/Main_Window/Icons/search.png</iconset>
    </property>
    <property name="text">
@@ -936,8 +959,8 @@
   </action>
   <action name="actionMQL5_Community">
    <property name="icon">
-    <iconset>
-     <normaloff>:/Main_Window/Icons/Community.png</normaloff>:/Main_Window/Icons/Community.png</iconset>
+    <iconset resource="Main_Icons.qrc">
+     <normaloff>:/Main_Window/Icons/community.png</normaloff>:/Main_Window/Icons/community.png</iconset>
    </property>
    <property name="text">
     <string>MQL5.Community</string>
@@ -945,7 +968,7 @@
   </action>
   <action name="actionLevel">
    <property name="icon">
-    <iconset>
+    <iconset resource="Main_Icons.qrc">
      <normaloff>:/Main_Window/Icons/achievment.png</normaloff>:/Main_Window/Icons/achievment.png</iconset>
    </property>
    <property name="text">
@@ -1180,6 +1203,16 @@
   <action name="actionMQL5_Docummentation">
    <property name="text">
     <string>MQL5 Docummentation</string>
+   </property>
+  </action>
+  <action name="actiontheme">
+   <property name="icon">
+    <iconset>
+     <normalon>:/Main_Window/Icons/WhatsApp Image 2026-02-19 at 10.15.23 AM.jpeg</normalon>
+    </iconset>
+   </property>
+   <property name="text">
+    <string>theme</string>
    </property>
   </action>
  </widget>

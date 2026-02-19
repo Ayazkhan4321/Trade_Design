@@ -31,8 +31,8 @@ def test_create_account_validation():
         lastName="Smith",
         email="bad-email",
         phone="123",
-        accountTypeID=1,
-        creationType="Live",
+        roleName="Trader",
+        refLink=0,
     )
     ok, msg, retry = svc.create_account(payload)
     assert not ok
@@ -47,8 +47,8 @@ def test_create_account_success(monkeypatch):
         lastName="Doe",
         email="john@example.com",
         phone="+11234567890",
-        accountTypeID=1,
-        creationType="Live",
+        roleName="Trader",
+        refLink=0,
     )
     ok, msg, retry = svc.create_account(payload)
     assert ok
@@ -76,9 +76,10 @@ def test_verify_otp_success(monkeypatch):
 
 
 def test_verify_otp_bad_code(monkeypatch):
-    # server reports a bad request
+    # server reports a bad request; need to set a generic endpoint so test hits the HTTP layer
     resp = DummyResp(status_code=400, json_data={"message": "Invalid code"})
     monkeypatch.setattr(svc, "_get_session", lambda: DummySession(resp))
+    monkeypatch.setitem(svc.__dict__, 'API_ACCOUNTS_VERIFY', 'https://api.example/Users/verify-otp')
     ok, msg, retry = svc.verify_otp("john@example.com", "0000")
     assert not ok
     assert "Invalid" in msg

@@ -3,7 +3,7 @@
 ################################################################################
 ## Form generated from reading UI file 'Main_page.ui'
 ##
-## Created by: Qt User Interface Compiler version 6.10.1
+## Created by: Qt User Interface Compiler version 6.10.2
 ##
 ## WARNING! All changes made in this file will be lost when recompiling UI file!
 ################################################################################
@@ -17,8 +17,7 @@ from PySide6.QtGui import (QAction, QBrush, QColor, QConicalGradient,
     QPainter, QPalette, QPixmap, QRadialGradient,
     QTransform)
 from PySide6.QtWidgets import (QApplication, QMainWindow, QMenu, QMenuBar,
-    QSizePolicy, QStackedWidget, QStatusBar, QToolBar,
-    QWidget)
+    QSizePolicy, QStatusBar, QToolBar, QWidget)
 import Main_Icons_rc
 import Main_Icons_rc
 
@@ -26,8 +25,14 @@ class Ui_MainWindow(object):
     def setupUi(self, MainWindow):
         if not MainWindow.objectName():
             MainWindow.setObjectName(u"MainWindow")
-        MainWindow.resize(1077, 540)
+        MainWindow.setEnabled(True)
+        MainWindow.resize(1406, 858)
+        MainWindow.setMouseTracking(False)
+        MainWindow.setTabletTracking(False)
+        MainWindow.setAcceptDrops(False)
         MainWindow.setToolButtonStyle(Qt.ToolButtonIconOnly)
+        MainWindow.setDocumentMode(False)
+        MainWindow.setUnifiedTitleAndToolBarOnMac(False)
         self.actionOpen_Deleted = QAction(MainWindow)
         self.actionOpen_Deleted.setObjectName(u"actionOpen_Deleted")
         self.actionProfiles = QAction(MainWindow)
@@ -342,12 +347,14 @@ class Ui_MainWindow(object):
         self.actionsearch.setIcon(icon42)
         self.actionMQL5_Community = QAction(MainWindow)
         self.actionMQL5_Community.setObjectName(u"actionMQL5_Community")
-        self.actionMQL5_Community.setIcon(icon11)
+        icon43 = QIcon()
+        icon43.addFile(u":/Main_Window/Icons/community.png", QSize(), QIcon.Mode.Normal, QIcon.State.Off)
+        self.actionMQL5_Community.setIcon(icon43)
         self.actionLevel = QAction(MainWindow)
         self.actionLevel.setObjectName(u"actionLevel")
-        icon43 = QIcon()
-        icon43.addFile(u":/Main_Window/Icons/achievment.png", QSize(), QIcon.Mode.Normal, QIcon.State.Off)
-        self.actionLevel.setIcon(icon43)
+        icon44 = QIcon()
+        icon44.addFile(u":/Main_Window/Icons/achievment.png", QSize(), QIcon.Mode.Normal, QIcon.State.Off)
+        self.actionLevel.setIcon(icon44)
         self.actionIndicators = QAction(MainWindow)
         self.actionIndicators.setObjectName(u"actionIndicators")
         self.actionObjects = QAction(MainWindow)
@@ -440,18 +447,25 @@ class Ui_MainWindow(object):
         self.actionMQL5_Webtrader.setObjectName(u"actionMQL5_Webtrader")
         self.actionMQL5_Docummentation = QAction(MainWindow)
         self.actionMQL5_Docummentation.setObjectName(u"actionMQL5_Docummentation")
+        
+        # spacer = QWidget()
+       # spacer.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Preferred)
+       # spacer.setObjectName(u"spacer")
+
+
+        self.actiontheme = QAction(MainWindow)
+        self.actiontheme.setObjectName(u"actiontheme")
+
+
+        icon45 = QIcon()
+        icon45.addFile(u":/Main_Window/Icons/WhatsApp Image 2026-02-19 at 10.15.23 AM.jpeg", QSize(), QIcon.Mode.Normal, QIcon.State.On)
+        self.actiontheme.setIcon(icon45)
         self.centralwidget = QWidget(MainWindow)
         self.centralwidget.setObjectName(u"centralwidget")
-        self.stackedWidget = QStackedWidget(self.centralwidget)
-        self.stackedWidget.setObjectName(u"stackedWidget")
-        self.stackedWidget.setGeometry(QRect(0, 0, 1071, 471))
-        self.page_main = QWidget()
-        self.page_main.setObjectName(u"page_main")
-        self.stackedWidget.addWidget(self.page_main)
         MainWindow.setCentralWidget(self.centralwidget)
         self.menubar = QMenuBar(MainWindow)
         self.menubar.setObjectName(u"menubar")
-        self.menubar.setGeometry(QRect(0, 0, 1077, 18))
+        self.menubar.setGeometry(QRect(0, 0, 1406, 26))
         self.menuFile = QMenu(self.menubar)
         self.menuFile.setObjectName(u"menuFile")
         self.menuNew_Chart = QMenu(self.menuFile)
@@ -486,6 +500,7 @@ class Ui_MainWindow(object):
         MainWindow.setMenuBar(self.menubar)
         self.toolBar = QToolBar(MainWindow)
         self.toolBar.setObjectName(u"toolBar")
+        self.toolBar.setAcceptDrops(True)
         MainWindow.addToolBar(Qt.ToolBarArea.TopToolBarArea, self.toolBar)
         self.statusBar = QStatusBar(MainWindow)
         self.statusBar.setObjectName(u"statusBar")
@@ -668,11 +683,10 @@ class Ui_MainWindow(object):
         self.toolBar.addAction(self.actionsearch)
         self.toolBar.addAction(self.actionMQL5_Community)
         self.toolBar.addAction(self.actionLevel)
+        self.toolBar.addSeparator()
+        self.toolBar.addAction(self.actiontheme)
 
         self.retranslateUi(MainWindow)
-
-        self.stackedWidget.setCurrentIndex(0)
-
 
         QMetaObject.connectSlotsByName(MainWindow)
     # setupUi
@@ -824,6 +838,7 @@ class Ui_MainWindow(object):
         self.actionVideo_Guides.setText(QCoreApplication.translate("MainWindow", u"Video Guides", None))
         self.actionMQL5_Webtrader.setText(QCoreApplication.translate("MainWindow", u"MQL5 Webtrader", None))
         self.actionMQL5_Docummentation.setText(QCoreApplication.translate("MainWindow", u"MQL5 Docummentation", None))
+        self.actiontheme.setText(QCoreApplication.translate("MainWindow", u"theme", None))
         self.menuFile.setTitle(QCoreApplication.translate("MainWindow", u"File", None))
         self.menuNew_Chart.setTitle(QCoreApplication.translate("MainWindow", u"New Chart", None))
         self.menuForex.setTitle(QCoreApplication.translate("MainWindow", u"Forex", None))

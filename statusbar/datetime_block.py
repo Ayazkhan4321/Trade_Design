@@ -16,9 +16,13 @@ class DateTimeBlock(QLabel):
         self._update_system_time()
 
     def _update_system_time(self):
-        if not self._chart_override:
-            now = QDateTime.currentDateTime()
-            self.setText(now.toString("yyyy.MM.dd hh:mm"))
+        try:
+            if not self._chart_override:
+                now = QDateTime.currentDateTime()
+                self.setText(now.toString("yyyy.MM.dd hh:mm"))
+        except Exception:
+            # Ignore errors during shutdown or when widget is being destroyed
+            pass
 
     # ===== Chart control =====
     def set_chart_time(self, qdatetime: QDateTime):

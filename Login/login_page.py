@@ -7,6 +7,8 @@ from auth.login_worker import LoginWorker
 class LoginPage(QDialog):
     # Emit the email string on success so the main window can display who is
     # currently signed in.
+    # Emit the email string on success for backwards compatibility.
+    # Full response payload is attached to `self.response_data`.
     login_success = Signal(str)
     create_account_requested = Signal()
     forgot_password_requested = Signal()
@@ -26,6 +28,7 @@ class LoginPage(QDialog):
         try:
             from . import login_style as style
             style.apply_login_styles(self.ui)
+            style.apply_dialog_border(self)
         except Exception:
             pass
 
@@ -82,7 +85,8 @@ class LoginPage(QDialog):
 
         self.thread.start()
 
-    def _on_login_result(self, success, message):
+    def _on_login_result(self, success, message, response_data=None):
+        # Support LoginWorker that emits (success, message, response_data)
         self.ui.btn_signin.setEnabled(True)
 
         if not success:
@@ -90,17 +94,40 @@ class LoginPage(QDialog):
             self._show_error("Login Failed", message)
             return
 
-        # ✅ Login successful: emit signal (with email) and close dialog
-        if self._last_email:
-            self.login_success.emit(self._last_email)
-        else:
-            self.login_success.emit("")
+        # Attach the response details to the dialog for callers that inspect it
+        try:
+            self.response_data = response_data
+        except Exception:
+            self.response_data = None
+
+        # Prefer email from response payload when available, otherwise use last entered email
+        email = None
+        try:
+            if isinstance(response_data, dict):
+                data = response_data.get("data", response_data)
+                if isinstance(data, dict):
+                    email = data.get("email")
+        except Exception:
+            email = None
+
+        if not email:
+            email = self._last_email or ""
+
+        # ✅ Login successful: emit email string for backwards compatibility and close dialog
+        try:
+            self.login_success.emit(email)
+        except Exception:
+            pass
+
         self.accept()  # Closes the dialog
 
     # ---------------- LABEL ACTIONS ----------------
 
     def _create_account_clicked(self, event):
+        print("[DEBUG] LoginPage._create_account_clicked() called")
+        print(f"[DEBUG] create_account_requested signal: {self.create_account_requested}")
         self.create_account_requested.emit()
+        print("[DEBUG] Signal emitted")
 
     def _forgot_password_clicked(self, event):
         self.forgot_password_requested.emit()

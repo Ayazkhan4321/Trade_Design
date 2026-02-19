@@ -12,6 +12,9 @@ from PySide6.QtCore import QObject, Signal, QThread, Qt, QTimer
 from .create_account_ui import Ui_create_account
 from .create_account_service import create_account, get_countries, CreateAccountRequest, verify_otp
 from . import create_account_style as style
+from . import create_account_style_step1
+from . import create_account_style_step2
+from . import create_account_style_step3
 
 logger = logging.getLogger(__name__)
 
@@ -62,7 +65,7 @@ class CreateAccountWorker(QObject):
     def run(self, payload: CreateAccountRequest) -> None:
         try:
             # Request creation and ask for the server data to be returned when available
-            res = create_account(payload, include_data=True)
+            res = create_account(payload, include_data=True, debug=True)
             # Support both (success, message, retryable) and (success, message, retryable, data)
             if isinstance(res, tuple) and len(res) == 3:
                 success, message, retryable = res
@@ -94,7 +97,7 @@ class VerifyWorker(QObject):
             self.finished.emit(False, "Cancelled", False)
             return
         try:
-            vres = verify_otp(identifier, code, account_type_id)
+            vres = verify_otp(identifier, code, account_type_id, debug=True)
             if isinstance(vres, tuple) and len(vres) == 3:
                 v_success, v_message, v_retry = vres
             else:
@@ -124,12 +127,15 @@ class CreateAccountDialog(QDialog):
         self.ui = Ui_create_account()
         self.ui.setupUi(self)
 
-        # Apply styles (best-effort)
+        # Apply styles for Step 1 initially
         try:
-            style.apply_create_account_styles(self.ui, self)
+            create_account_style_step1.apply_step1_styles(self.ui, self)
         except Exception:
-            # ignore and continue
-            pass
+            # Fallback to old style if needed
+            try:
+                style.apply_create_account_styles(self.ui, self)
+            except Exception:
+                pass
 
         # Make dialog match the Designer window title/size and center on parent
         try:
@@ -145,7 +151,11 @@ class CreateAccountDialog(QDialog):
             pass
 
         # initial state
-        self.ui.pb_continue_verify.setEnabled(False)
+        # Some layouts use pb_continue_verify while others use pb_continue_to_verification; handle both
+        if hasattr(self.ui, 'pb_continue_verify'):
+            self.ui.pb_continue_verify.setEnabled(False)
+        elif hasattr(self.ui, 'pb_continue_to_verification'):
+            self.ui.pb_continue_to_verification.setEnabled(False)
         self.ui.cmb_country_code.addItem("Loading...")
         self.ui.cmb_country_code.setEnabled(False)
 
@@ -154,24 +164,127 @@ class CreateAccountDialog(QDialog):
         self.ui.le_last_name.textChanged.connect(self._on_input_changed)
         self.ui.le_number.textChanged.connect(self._on_input_changed)
         self.ui.cb_terms_privacy_policy.stateChanged.connect(self._on_input_changed)
-        self.ui.pb_continue_verify.clicked.connect(self._on_continue_clicked)
+
+        # Helper to safely connect a named button only when its runtime objectName matches the expected
+        def _safe_connect(attr_name: str, handler, role_name: str = None) -> None:
+            btn = getattr(self.ui, attr_name, None)
+            if btn is None:
+                return
+            try:
+                # If the widget's objectName does not match the attribute we expected, skip to avoid collisions
+                if getattr(btn, 'objectName', None) and callable(btn.objectName):
+                    if btn.objectName() != attr_name:
+                        logger.warning("UI attribute '%s' has objectName '%s' (expected '%s'); skipping to avoid collision.", attr_name, btn.objectName(), attr_name)
+                        return
+            except Exception:
+                logger.exception("Error checking objectName for %s; skipping connect", attr_name)
+                return
+
+            # Prevent connecting two different logical handlers to the same widget instance
+            existing_roles = getattr(btn, '_connected_roles', None)
+            if existing_roles is None:
+                existing_roles = set()
+                setattr(btn, '_connected_roles', existing_roles)
+            if existing_roles and role_name and role_name not in existing_roles:
+                logger.warning("Widget '%s' already connected to %s; skipping connect to avoid double-binding.", attr_name, existing_roles)
+                return
+
+            try:
+                btn.clicked.connect(handler)
+                existing_roles.add(role_name or attr_name)
+            except Exception:
+                pass
+
+        # Connect continue buttons: page0 -> account selection, page1 -> create and request verification
+        _safe_connect('pb_continue_to_account_selection', self._on_continue_clicked, 'continue')
+        _safe_connect('pb_continue_verify', self._on_continue_clicked, 'continue')
+        _safe_connect('pb_continue_to_verification', self._on_continue_clicked, 'continue')
+
+        # provide sign-in link
         self.ui.lb_signin.mousePressEvent = lambda event: self.reject()
 
         # verification page controls (initially disabled)
         try:
-            self.ui.pb_verify.setEnabled(False)
-            self.ui.pb_verify.setCursor(Qt.ForbiddenCursor)
-            self.ui.le_code.textChanged.connect(self._on_code_changed)
-            self.ui.pb_verify.clicked.connect(self._on_verify_clicked)
-            self.ui.pb_back.clicked.connect(lambda: self._go_back_to_registration())
+            # Defensive wiring: avoid binding handlers to the wrong widget if UI attributes were misnamed
+            if getattr(self.ui, 'pb_verify', None) is not None:
+                try:
+                    btn = self.ui.pb_verify
+                    if getattr(btn, 'objectName', None) and callable(btn.objectName):
+                        if btn.objectName() != 'pb_verify':
+                            logger.warning("pb_verify attribute has unexpected objectName '%s'; skipping pb_verify connect to avoid collision.", btn.objectName())
+                        else:
+                            # check that pb_verify is not the same instance as any of the continue buttons
+                            collision_found = False
+                            for other in ('pb_continue_verify', 'pb_continue_to_verification', 'pb_continue_to_account_selection'):
+                                other_btn = getattr(self.ui, other, None)
+                                if other_btn is btn:
+                                    logger.warning("pb_verify widget is the same instance as %s; skipping pb_verify connect to avoid double-binding.", other)
+                                    collision_found = True
+                                    break
+                            if not collision_found:
+                                self.ui.pb_verify.setEnabled(False)
+                                self.ui.pb_verify.setCursor(Qt.ForbiddenCursor)
+                                self.ui.le_code.textChanged.connect(self._on_code_changed)
+                                try:
+                                    self.ui.pb_verify.clicked.connect(self._on_verify_clicked)
+                                except Exception:
+                                    pass
+                except Exception:
+                    logger.exception("Error validating pb_verify objectName; skipping pb_verify connect")
+            # back button wiring (no special name checks needed)
+            if getattr(self.ui, 'pb_back', None) is not None:
+                try:
+                    self.ui.pb_back.clicked.connect(lambda: self._go_back_to_registration())
+                except Exception:
+                    pass
         except Exception:
             # If UI was not updated in Designer, ignore
             pass
 
-        # enforce single selection for account type buttons
-        for btn_name in ("pb_classic", "pb_ecn", "pb_premium", "pb_other"):
-            btn = getattr(self.ui, btn_name)
-            btn.clicked.connect(self._on_account_type_clicked)
+        # Account type selection: use dedicated selector to enforce one selected button
+        try:
+            from .account_type_selector import AccountTypeSelector
+            self._account_selector = AccountTypeSelector()
+            # discover buttons on the UI with naming convention "pb_*" and map
+            mapping = {"classic": 1, "ecn": 2, "premium": 8, "other": 4}
+            for attr in dir(self.ui):
+                if not attr.startswith("pb_"):
+                    continue
+                try:
+                    btn = getattr(self.ui, attr)
+                except Exception:
+                    continue
+                lname = attr.lower()
+                for key, idx in mapping.items():
+                    if key in lname:
+                        try:
+                            # register with selector and also ensure selecting triggers validation
+                            self._account_selector.register(btn, idx)
+                            try:
+                                btn.clicked.connect(self._on_input_changed)
+                            except Exception:
+                                try:
+                                    btn.pressed.connect(lambda b=btn: self._on_input_changed())
+                                except Exception:
+                                    pass
+                        except Exception:
+                            pass
+                        break
+        except Exception:
+            # if selector cannot be created, fall back to original simple logic
+            try:
+                for btn_name in ("pb_classic", "pb_ecn", "pb_premium", "pb_other"):
+                    btn = getattr(self.ui, btn_name)
+                    btn.clicked.connect(self._on_account_type_clicked)
+                    try:
+                        btn.clicked.connect(self._on_input_changed)
+                    except Exception:
+                        try:
+                            btn.pressed.connect(lambda b=btn: self._on_input_changed())
+                        except Exception:
+                            pass
+            except Exception:
+                pass
 
         # Thread placeholders (separate threads for create, send, and verify to avoid conflicts)
         self._create_thread: Optional[QThread] = None
@@ -185,6 +298,9 @@ class CreateAccountDialog(QDialog):
         # created account data (if server returned it)
         self._created_user_id: Optional[int] = None
         self._created_user_data: Optional[dict] = None
+
+        # pending payload collected on page 0 and used when Continue on page 1 is pressed
+        self._pending_create_payload: Optional[CreateAccountRequest] = None
 
         # OTP countdown and resend bookkeeping
         self._last_send_time: Optional[datetime] = None
@@ -200,6 +316,25 @@ class CreateAccountDialog(QDialog):
         # Start loading countries
         self._start_load_countries()
 
+        # Ensure initial validation state reflects current form (important if navigating back)
+        try:
+            self._on_input_changed()
+        except Exception:
+            pass
+
+    def _apply_step_styles(self, step_number: int) -> None:
+        """Apply styling for the specified step (1, 2, or 3)."""
+        try:
+            if step_number == 1:
+                create_account_style_step1.apply_step1_styles(self.ui, self)
+            elif step_number == 2:
+                create_account_style_step2.apply_step2_styles(self.ui, self)
+            elif step_number == 3:
+                create_account_style_step3.apply_step3_styles(self.ui, self)
+            logger.debug(f"Applied styling for step {step_number}")
+        except Exception:
+            logger.exception(f"Failed to apply styling for step {step_number}")
+
     def _on_account_type_clicked(self) -> None:
         # ensure only the clicked button is checked
         for btn_name in ("pb_classic", "pb_ecn", "pb_premium", "pb_other"):
@@ -212,18 +347,59 @@ class CreateAccountDialog(QDialog):
 
     def _on_input_changed(self, *args) -> None:
         # Enable continue button only when required fields are present and terms accepted
-        first = self.ui.le_first_name.text().strip()
-        last = self.ui.le_last_name.text().strip()
-        number = self.ui.le_number.text().strip()
-        terms = self.ui.cb_terms_privacy_policy.isChecked()
-        account_type_selected = any(getattr(self.ui, name).isChecked() for name in ("pb_classic", "pb_ecn", "pb_premium", "pb_other"))
+        # Phone number is optional for now; email is required for verification.
+        first = self.ui.le_first_name.text().strip() if getattr(self.ui, 'le_first_name', None) is not None else ''
+        last = self.ui.le_last_name.text().strip() if getattr(self.ui, 'le_last_name', None) is not None else ''
+        email_val = getattr(self.ui, 'le_email', None).text().strip() if getattr(self.ui, 'le_email', None) is not None else ''
+        terms = self.ui.cb_terms_privacy_policy.isChecked() if getattr(self.ui, 'cb_terms_privacy_policy', None) is not None else False
 
-        if first and last and number and terms and account_type_selected:
-            self.ui.pb_continue_verify.setEnabled(True)
-            self.ui.pb_continue_verify.setCursor(Qt.PointingHandCursor)
+        # Determine current page to choose which continue button to enable and validation rules
+        current_index = 0
+        try:
+            current_index = self.ui.stackedWidget.currentIndex()
+        except Exception:
+            pass
+
+        # Determine if an account type is selected (used on page 1)
+        account_type_selected = False
+        try:
+            if getattr(self, '_account_selector', None) is not None:
+                account_type_selected = self._account_selector.get_selected() is not None
+            else:
+                for name in ("pb_classic", "pb_classic_2", "pb_ecn", "pb_ecn_2", "pb_premium", "pb_premium_2", "pb_other", "pb_other_2"):
+                    if hasattr(self.ui, name):
+                        try:
+                            if getattr(self.ui, name).isChecked():
+                                account_type_selected = True
+                                break
+                        except Exception:
+                            pass
+        except Exception:
+            account_type_selected = False
+
+        # Decide which continue button to control depending on the page
+        if current_index == 0:
+            # Page 0: Only require first name, last name, and email (terms checkbox is on page 1 now)
+            btn = getattr(self.ui, 'pb_continue_to_account_selection', None)
+            required = bool(first and last and email_val)
         else:
-            self.ui.pb_continue_verify.setEnabled(False)
-            self.ui.pb_continue_verify.setCursor(Qt.ForbiddenCursor)
+            # Page 1: Require all fields including terms and account type selection
+            btn = getattr(self.ui, 'pb_continue_verify', None) or getattr(self.ui, 'pb_continue_to_verification', None)
+            required = bool(first and last and email_val and terms and account_type_selected)
+
+        if btn:
+            if required:
+                btn.setEnabled(True)
+                try:
+                    btn.setCursor(Qt.PointingHandCursor)
+                except Exception:
+                    pass
+            else:
+                btn.setEnabled(False)
+                try:
+                    btn.setCursor(Qt.ForbiddenCursor)
+                except Exception:
+                    pass
 
     def _start_load_countries(self) -> None:
         self._countries_thread = QThread()
@@ -239,27 +415,16 @@ class CreateAccountDialog(QDialog):
 
     def _on_countries_loaded(self, success: bool, data, retryable: bool) -> None:
         # Use the dedicated country utils to format/store combo entries
-        from .country_utils import format_country_display, normalize_country_data
+        from .country_combobox import populate_country_combobox
 
-        self.ui.cmb_country_code.clear()
-        if success and isinstance(data, list):
-            added = False
-            for c in data:
-                normalized = normalize_country_data(c) if isinstance(c, dict) else None
-                if normalized is None:
-                    # Skip malformed entries
-                    continue
-                display = format_country_display(normalized)
-                self.ui.cmb_country_code.addItem(display, normalized)
-                added = True
-
-            if added:
-                self.ui.cmb_country_code.setEnabled(True)
-                return
+        if success and isinstance(data, list) and len(data) > 0:
+            populate_country_combobox(self.ui.cmb_country_code, data)
+            self.ui.cmb_country_code.setEnabled(True)
+            return
 
         # Fallback if nothing usable was added
         fallback = {"name": "United States", "dial_code": "+1", "code": "US"}
-        self.ui.cmb_country_code.addItem(format_country_display(fallback), fallback)
+        populate_country_combobox(self.ui.cmb_country_code, [fallback])
         self.ui.cmb_country_code.setEnabled(True)
 
         if not success:
@@ -269,6 +434,18 @@ class CreateAccountDialog(QDialog):
                 QMessageBox.warning(self, "Countries", str(data))
 
     def _on_continue_clicked(self) -> None:
+        # Ignore clicks that did not come from continue buttons to avoid accidental double actions
+        s = self.sender()
+        if s is not None:
+            try:
+                name = s.objectName() if callable(getattr(s, 'objectName', None)) else None
+                if name not in (None, 'pb_continue_to_account_selection', 'pb_continue_verify', 'pb_continue_to_verification'):
+                    logger.warning("Ignoring _on_continue_clicked call from unexpected sender '%s' (objectName=%s)", s, name)
+                    return
+            except Exception:
+                logger.exception("Error checking sender for _on_continue_clicked; ignoring sender to be safe")
+                return
+
         # Validate again
         first = self.ui.le_first_name.text().strip()
         last = self.ui.le_last_name.text().strip()
@@ -281,26 +458,48 @@ class CreateAccountDialog(QDialog):
         # Log click and payload for debugging
         logger.debug("Create account requested for email=%s phone=%s", email_val, number)
 
-        # account type mapping
+        # account type mapping (accept both pb_* and pb_*_2 names, prefer AccountTypeSelector when available)
         account_map = {
             "pb_classic": 1,
             "pb_ecn": 2,
-            "pb_premium": 3,
+            "pb_premium": 8,
             "pb_other": 4,
         }
         selected = None
-        for name, idx in account_map.items():
-            btn = getattr(self.ui, name)
-            if btn.isChecked():
-                selected = idx
-                break
+        try:
+            if getattr(self, '_account_selector', None) is not None:
+                selected = self._account_selector.get_selected()
+            else:
+                for name, idx in account_map.items():
+                    # try both original and "_2" suffixed widget names
+                    for candidate in (name, f"{name}_2"):
+                        if hasattr(self.ui, candidate):
+                            try:
+                                if getattr(self.ui, candidate).isChecked():
+                                    selected = idx
+                                    break
+                            except Exception:
+                                pass
+                    if selected is not None:
+                        break
+        except Exception:
+            selected = None
 
-        creation_type = "Live" if self.ui.Live_Demo_tab.currentIndex() == 0 else "Demo"
+        # Support both old and new naming for the tab widget
+        creation_widget = getattr(self.ui, 'Live_Demo_tab', None) or getattr(self.ui, 'Live_Demo_tab_2', None)
+        try:
+            creation_type = "Live" if (creation_widget is not None and creation_widget.currentIndex() == 0) else "Demo"
+        except Exception:
+            creation_type = "Live"
 
         country_data = None
         current_index = self.ui.cmb_country_code.currentIndex()
         if current_index >= 0:
             country_data = self.ui.cmb_country_code.itemData(current_index)
+
+        # Map account type to role name
+        # Backend accepts "User" as the role name
+        role_name = "User"
 
         # Build payload for account creation now (account will be created BEFORE verification)
         payload = CreateAccountRequest(
@@ -308,10 +507,8 @@ class CreateAccountDialog(QDialog):
             lastName=last,
             email=email_val,
             phone=number,
-            accountTypeID=selected,
-            creationType=creation_type,
-            referralCode=referral,
-            country=country_data,
+            roleName=role_name,
+            refLink=0,
         )
 
         # Require an email address for verification; do not send to phone
@@ -319,9 +516,57 @@ class CreateAccountDialog(QDialog):
             QMessageBox.warning(self, "Email required", "Please enter an email address to receive the verification code.")
             return
 
-        # disable UI while request runs
-        self.ui.pb_continue_verify.setEnabled(False)
-        self.ui.pb_continue_verify.setText("Creating...")
+        # If we're on page 0, store payload and navigate to account selection (page 1)
+        current_index = self.ui.stackedWidget.currentIndex()
+        if current_index == 0:
+            # store pending payload and navigate to account selection
+            self._pending_create_payload = payload
+            try:
+                self.ui.stackedWidget.setCurrentIndex(1)
+                # Apply Step 2 styling
+                self._apply_step_styles(2)
+            except Exception:
+                # fallback: try index 1 anyway
+                try:
+                    self.ui.stackedWidget.setCurrentIndex(1)
+                    self._apply_step_styles(2)
+                except Exception:
+                    pass
+            return
+
+        # Otherwise (we're on account selection page), finalize accountType and create user
+        try:
+            # account type must be selected via AccountTypeSelector
+            account_type_selected = None
+            try:
+                if getattr(self, '_account_selector', None) is not None:
+                    account_type_selected = self._account_selector.get_selected()
+            except Exception:
+                account_type_selected = None
+
+            if account_type_selected is None:
+                QMessageBox.warning(self, "Select Account Type", "Please select an account type to continue.")
+                # navigate to account selection page if not already
+                try:
+                    self.ui.stackedWidget.setCurrentIndex(1)
+                except Exception:
+                    pass
+                return
+
+            # Use stored payload if present, else the computed payload
+            if self._pending_create_payload is not None:
+                payload = self._pending_create_payload
+            # Note: roleName and refLink are set once at initial payload creation; no need to update here
+
+            # disable UI while request runs
+            self.ui.pb_continue_to_verification.setEnabled(False) if hasattr(self.ui, 'pb_continue_to_verification') else None
+            #self.ui.pb_continue_verify.setEnabled(False) if hasattr(self.ui, 'pb_continue_verify') else None
+            #self.ui.pb_continue_to_account_selection.setEnabled(False) if hasattr(self.ui, 'pb_continue_to_account_selection') else None
+            self.ui.pb_continue_to_verification.setText('Creating...') if hasattr(self.ui, 'pb_continue_to_verification') else None
+        except Exception:
+            logger.exception("Failed to prepare payload for creation")
+            QMessageBox.warning(self, "Failed", "Could not prepare account creation request.")
+            return
 
         # Start a create-account worker thread (create user in DB, but DO NOT show success to user here)
         self._create_thread = QThread()
@@ -347,16 +592,29 @@ class CreateAccountDialog(QDialog):
         except Exception:
             message_text = ""
 
-        self.ui.pb_continue_verify.setEnabled(True)
-        self.ui.pb_continue_verify.setText("Continue to Verification")
+        btn = getattr(self.ui, 'pb_continue_verify', None) or getattr(self.ui, 'pb_continue_to_verification', None)
+        if btn:
+            btn.setEnabled(True)
+            try:
+                btn.setText("Continue to Verification")
+            except Exception:
+                pass
 
         if success:
             logger.info("Verification email successfully sent to %s", self.ui.le_email.text().strip() if getattr(self.ui, 'le_email', None) is not None else '<unknown>')
 
-            # Switch to verification page and focus the code input first so it's visible
+            # Switch to verification page (index=2) and focus the code input first so it's visible
             try:
-                self.ui.stackedWidget.setCurrentIndex(1)
-                # Force UI update and ensure dialog is raised so the user sees page 2
+                # prefer index 2 if available (3-page layout)
+                try:
+                    self.ui.stackedWidget.setCurrentIndex(2)
+                    # Apply Step 3 styling
+                    self._apply_step_styles(3)
+                except Exception:
+                    # fallback to 1 for older layouts
+                    self.ui.stackedWidget.setCurrentIndex(1)
+                    self._apply_step_styles(3)
+                # Force UI update and ensure dialog is raised so the user sees page 2/3
                 try:
                     from PySide6.QtWidgets import QApplication
                     QApplication.processEvents()
@@ -382,10 +640,23 @@ class CreateAccountDialog(QDialog):
             # add or enable resend button on verification page
             try:
                 if not hasattr(self.ui, 'pb_resend'):
-                    self.ui.pb_resend = QPushButton("Resend code", self.ui.stackedWidget.widget(1))
+                    # Use the verification page widget if 3-page layout exists
+                    try:
+                        vb = self.ui.stackedWidget.widget(2)
+                    except Exception:
+                        vb = self.ui.stackedWidget.widget(1)
+                    self.ui.pb_resend = QPushButton("Resend code", vb)
                     # place button below the verify/back buttons when possible
                     try:
-                        self.ui.pb_resend.setGeometry(self.ui.pb_back.geometry().x(), self.ui.pb_back.geometry().y() + 40, 140, 24)
+                        # try geometry relative to pb_back or pb_back_2
+                        if hasattr(self.ui, 'pb_back'):
+                            ref = self.ui.pb_back
+                        elif hasattr(self.ui, 'pb_back_2'):
+                            ref = self.ui.pb_back_2
+                        else:
+                            ref = None
+                        if ref is not None:
+                            self.ui.pb_resend.setGeometry(ref.geometry().x(), ref.geometry().y() + 40, 140, 24)
                     except Exception:
                         pass
                     self.ui.pb_resend.clicked.connect(self._on_resend_clicked)
@@ -451,8 +722,13 @@ class CreateAccountDialog(QDialog):
         else:
             logger.warning("Failed to send verification email to %s: %s", self.ui.le_email.text().strip() if getattr(self.ui, 'le_email', None) is not None else '<unknown>', message_text)
             # Re-enable continue button to allow retry or correction
-            self.ui.pb_continue_verify.setEnabled(True)
-            self.ui.pb_continue_verify.setText("Continue to Verification")
+            btn = getattr(self.ui, 'pb_continue_verify', None) or getattr(self.ui, 'pb_continue_to_verification', None)
+            if btn:
+                btn.setEnabled(True)
+                try:
+                    btn.setText("Continue to Verification")
+                except Exception:
+                    pass
             if retryable:
                 choice = QMessageBox.question(self, "Failed to send verification", f"{message_text}\n\nWould you like to retry?", QMessageBox.Retry | QMessageBox.Cancel)
                 if choice == QMessageBox.Retry:
@@ -484,8 +760,13 @@ class CreateAccountDialog(QDialog):
                 # start send-verification using JSON payload to satisfy server
                 contact_payload = {"email": email_text}
                 # reuse send flow
-                self.ui.pb_continue_verify.setEnabled(False)
-                self.ui.pb_continue_verify.setText("Sending...")
+                btn = getattr(self.ui, 'pb_continue_verify', None) or getattr(self.ui, 'pb_continue_to_verification', None)
+                if btn:
+                    try:
+                        btn.setEnabled(False)
+                        btn.setText("Sending...")
+                    except Exception:
+                        pass
 
                 self._send_thread = QThread()
                 self._send_thread.setObjectName("SendVerificationThread")
@@ -494,7 +775,7 @@ class CreateAccountDialog(QDialog):
                     def run(self, payload_value):
                         try:
                             from .create_account_service import send_verification
-                            res = send_verification(payload_value)
+                            res = send_verification(payload_value, debug=True)
                             if isinstance(res, tuple) and len(res) == 3:
                                 self.finished.emit(res[0], res[1], res[2], None)
                             elif isinstance(res, tuple) and len(res) == 4:
@@ -518,12 +799,27 @@ class CreateAccountDialog(QDialog):
             except Exception:
                 logger.exception("Exception while starting send-verification after create")
                 QMessageBox.warning(self, "Failed", "Could not start verification request.")
-                self.ui.pb_continue_verify.setEnabled(True)
-                self.ui.pb_continue_verify.setText("Continue to Verification")
+                btn = getattr(self.ui, 'pb_continue_verify', None) or getattr(self.ui, 'pb_continue_to_verification', None)
+                if btn:
+                    btn.setEnabled(True)
+                    try:
+                        btn.setText("Continue to Verification")
+                    except Exception:
+                        pass
         else:
             # Creation failed — re-enable and surface message similar to previous flow
-            self.ui.pb_continue_verify.setEnabled(True)
-            self.ui.pb_continue_verify.setText("Continue to Verification")
+            try:
+                if hasattr(self.ui, 'pb_continue_to_verification'):
+                    self.ui.pb_continue_to_verification.setEnabled(True)
+                    self.ui.pb_continue_to_verification.setText("Continue to Verification")
+            except Exception:
+                pass
+            try:
+                if hasattr(self.ui, 'pb_continue_to_account_selection'):
+                    self.ui.pb_continue_to_account_selection.setEnabled(True)
+                    self.ui.pb_continue_to_account_selection.setText("Continue to Account Selection")
+            except Exception:
+                pass
             if retryable:
                 choice = QMessageBox.question(self, "Failed to create account", f"{message}\n\nWould you like to retry?", QMessageBox.Retry | QMessageBox.Cancel)
                 if choice == QMessageBox.Retry:
@@ -562,7 +858,7 @@ class CreateAccountDialog(QDialog):
                 def run(self, payload_value):
                     try:
                         from .create_account_service import send_verification
-                        res = send_verification(payload_value)
+                        res = send_verification(payload_value, debug=True)
                         if isinstance(res, tuple) and len(res) == 3:
                             self.finished.emit(res[0], res[1], res[2], None)
                         elif isinstance(res, tuple) and len(res) == 4:
@@ -755,6 +1051,16 @@ class CreateAccountDialog(QDialog):
         if not code:
             QMessageBox.warning(self, "Invalid code", "Please enter the verification code.")
             return
+        if getattr(self, '_created_user_id', None) is None:
+            QMessageBox.critical(
+                self,
+                "Verification error",
+                "User ID not available. Please restart account creation."
+            )
+            return
+        
+        user_id = self._created_user_id
+
 
         # disable controls while verifying
         self.ui.le_code.setEnabled(False)
@@ -762,25 +1068,32 @@ class CreateAccountDialog(QDialog):
         self.ui.pb_verify.setText("Verifying...")
 
         # start verification worker thread
-        self._verify_thread = QThread()
+        self._verify_thread = QThread(self)
         self._verify_thread.setObjectName("CreateAccountVerifyThread")
         self._verify_worker = VerifyWorker()
         self._verify_worker.moveToThread(self._verify_thread)
         # Use the created user id if available, otherwise fall back to email
-        identifier = None
-        try:
-            identifier = str(getattr(self, '_created_user_id')) if getattr(self, '_created_user_id', None) is not None else (self.ui.le_email.text().strip() if getattr(self.ui, 'le_email', None) is not None else '')
-        except Exception:
-            identifier = self.ui.le_email.text().strip() if getattr(self.ui, 'le_email', None) is not None else ''
-        # Determine selected account type id for payload
+        identifier = user_id
+        # Determine selected account type id for payload (prefer AccountTypeSelector)
         account_type_selected = None
-        for name, idx in {"pb_classic":1, "pb_ecn":2, "pb_premium":3, "pb_other":4}.items():
-            try:
-                if getattr(self.ui, name).isChecked():
-                    account_type_selected = idx
-                    break
-            except Exception:
-                pass
+        try:
+            if getattr(self, '_account_selector', None) is not None:
+                account_type_selected = self._account_selector.get_selected()
+            else:
+                for name, idx in {"pb_classic":1, "pb_ecn":2, "pb_premium":3, "pb_other":4}.items():
+                    for candidate in (name, f"{name}_2"):
+                        if hasattr(self.ui, candidate):
+                            try:
+                                if getattr(self.ui, candidate).isChecked():
+                                    account_type_selected = idx
+                                    break
+                            except Exception:
+                                pass
+                    if account_type_selected is not None:
+                        break
+        except Exception:
+            account_type_selected = None
+        logger.debug("Starting verify for identifier=%s otp=%s accountType=%s", identifier, '***', account_type_selected)
         self._verify_thread.started.connect(lambda: self._verify_worker.run(identifier, code, account_type_selected))
         self._verify_worker.finished.connect(self._on_verify_finished)
         self._verify_worker.finished.connect(self._verify_thread.quit)
@@ -801,7 +1114,7 @@ class CreateAccountDialog(QDialog):
                 self._stop_otp_timer()
             except Exception:
                 logger.exception("Failed to stop OTP timer on successful verify")
-            QMessageBox.information(self, "Account created", message)
+            QMessageBox.information(self, "Verification successful", message or "OTP verified successfully.")
             self.accept()
         else:
             if retryable:
@@ -835,6 +1148,16 @@ class CreateAccountDialog(QDialog):
     def _go_back_to_registration(self) -> None:
         try:
             self.ui.stackedWidget.setCurrentIndex(0)
+            # Apply Step 1 styling when going back
+            self._apply_step_styles(1)
+        except Exception:
+            pass
+        try:
+            # ensure page1 selection tab is visible when going back
+            try:
+                self.ui.Live_Demo_tab_2.setCurrentIndex(0)
+            except Exception:
+                pass
         except Exception:
             pass
 

@@ -46,6 +46,8 @@ class ForgotPasswordResponse(BaseModel):
 
 def _get_session(retries: int = API_RETRIES) -> requests.Session:
     session = requests.Session()
+    # Add User-Agent header required by backend
+    session.headers.update({"User-Agent": "JetFyXDesktop/1.0"})
     backoff = Retry(
         total=retries,
         backoff_factor=0.5,
@@ -74,6 +76,7 @@ def send_reset_link(email: str) -> Tuple[bool, str, bool]:
 
     try:
         logger.debug("POST %s payload=%s", url, payload)
+        print(f"\n[DEBUG] Request Headers: {dict(session.headers)}")
         resp = session.post(url, json=payload, timeout=API_TIMEOUT, verify=API_VERIFY_TLS)
         logger.debug("Status code: %s", resp.status_code)
 

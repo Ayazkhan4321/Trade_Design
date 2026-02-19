@@ -84,6 +84,22 @@ def apply_create_account_styles(ui, parent_dialog: Optional[object] = None) -> N
     except Exception:
         pass
 
+    # Make Terms/Privacy text two separate links on the checkbox
+    try:
+        cb = ui.cb_terms_privacy_policy
+        cb.setTextFormat(Qt.RichText)
+        cb.setTextInteractionFlags(Qt.TextBrowserInteraction)
+        cb.setOpenExternalLinks(True)
+        cb.setText(
+            'I agree to the '
+            '<a href="https://example.com/terms" style="color:#1976D2; text-decoration: underline;">Terms of Service</a>'
+            ' and '
+            '<a href="https://example.com/privacy" style="color:#1976D2; text-decoration: underline;">Privacy Policy</a>'
+        )
+        cb.setStyleSheet("QCheckBox { color:#4a4a4a; } QCheckBox::indicator { margin-right:6px; }")
+    except Exception:
+        pass
+
     # Tab widget sizing to avoid tight contents
     try:
         ui.Live_Demo_tab.setStyleSheet("QTabWidget::pane { padding: 6px; }")
