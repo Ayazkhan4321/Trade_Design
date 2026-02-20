@@ -493,7 +493,7 @@ class MainWindow(QMainWindow):
             if hasattr(self, 'left_panel_dock') and self.left_panel_dock is not None:
                 total_w = max(1, self.width())
                 # Preferred: 35% of window width, clamp between 300 and 70%
-                pref = max(300, int(total_w * 0.30))
+                pref = max(300, int(total_w * 0.25))
                 max_w = max(pref, int(total_w * 0.7))
                 try:
                     self.left_panel_dock.setMinimumWidth(pref)
