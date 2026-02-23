@@ -1,27 +1,4 @@
-# Python
 __pycache__/
-*.py[cod]
-*.pyo
-*.pyd
-
-# Virtual environment
-venv/
-.env/
-
-# VS Code
-.vscode/
-
-# OS files
-.DS_Store
-Thumbs.db
-
-# Logs
-*.log
-
-# Pytest cache
+*.pyc
 .pytest_cache/
-
-# Build files
-build/
-dist/
-*.egg-info/
+venv/
