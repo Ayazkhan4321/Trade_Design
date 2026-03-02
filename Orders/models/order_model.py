@@ -80,7 +80,7 @@ class OrderModel(QAbstractTableModel):
             return Qt.NoItemFlags
         return Qt.ItemIsSelectable | Qt.ItemIsEnabled
 
-    def headerData(self, section, orientation, role):
+    def headerData(self, section, orientation, role=Qt.DisplayRole):
         if role == Qt.DisplayRole and orientation == Qt.Horizontal:
             return self.headers[section]
         return None

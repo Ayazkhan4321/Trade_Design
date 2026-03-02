@@ -55,12 +55,17 @@ class MainWindow(QMainWindow):
         self._signed_in_user = None
         self._sign_out_action = None
 
+        #Theme toggle connection 
+    
+
         # ---- Market Watch Dock Widget ----
         # Removed Market Watch dock widget
         self.market_watch_widget = None
 
         # ---- Menu / Toolbar actions ----
         self._connect_actions()
+        
+
 
         # ---- Left Panel Dock (optional) ----
         try:
@@ -494,7 +499,7 @@ class MainWindow(QMainWindow):
                 total_w = max(1, self.width())
                 # Preferred: 35% of window width, clamp between 300 and 70%
                 pref = max(300, int(total_w * 0.25))
-                max_w = max(pref, int(total_w * 0.5))
+                max_w = max(pref, int(total_w * 0.7))
                 try:
                     self.left_panel_dock.setMinimumWidth(pref)
                 except Exception:
