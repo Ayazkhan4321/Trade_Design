@@ -1,7 +1,7 @@
 {
     "advance_view": true,
     "one_click_trade": false,
-    "default_lot": 3.0,
+    "default_lot": 0.01,
     "default_lot_enabled": true,
     "window_width": 420,
     "window_height": 600,

@@ -1,0 +1,10 @@
+{
+  "theme": "system",
+  "crazy_color": "blue",
+  "time_period_overrides": {
+    "morning": "crazy_green",
+    "night": "light",
+    "evening": "crazy_purple",
+    "afternoon": "crazy_green"
+  }
+}

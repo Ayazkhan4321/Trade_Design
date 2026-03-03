@@ -46,18 +46,36 @@ class HistoryTable(QWidget):
         self.view.verticalHeader().setVisible(False)
         self.view.setAlternatingRowColors(True)
 
-        # Disable hover background and enforce a consistent selection color
+        # Disable hover and use theme-driven selection colour
         try:
+            from Theme.theme_manager import ThemeManager
+            t = ThemeManager.instance().tokens()
+            self.view.setStyleSheet(
+                f"QTableView::item:hover {{ background: {t['bg_row_hover']}; }}"
+                f"QTableView::item:selected {{ background: {t['bg_selected']}; color: {t['text_selected']}; }}"
+                f"QTableView {{ selection-background-color: {t['bg_selected']}; selection-color: {t['text_selected']}; }}"
+            )
+            def _on_theme_changed_history_table(name, tok, v=self.view):
+                try:
+                    v.setStyleSheet(
+                        f"QTableView::item:hover {{ background: {tok['bg_row_hover']}; }}"
+                        f"QTableView::item:selected {{ background: {tok['bg_selected']}; color: {tok['text_selected']}; }}"
+                        f"QTableView {{ selection-background-color: {tok['bg_selected']}; selection-color: {tok['text_selected']}; }}"
+                    )
+                except RuntimeError:
+                    # Widget was deleted, ignore
+                    pass
+            ThemeManager.instance().theme_changed.connect(_on_theme_changed_history_table)
+            self.view.setMouseTracking(False)
+            self.view.setFocusPolicy(Qt.NoFocus)
+        except Exception:
             self.view.setStyleSheet(
                 "QTableView::item:hover { background: transparent; }"
                 "QTableView::item:selected { background: #0B63B8; color: white; }"
                 "QTableView { selection-background-color: #0B63B8; selection-color: white; }"
             )
-            # Avoid hover events that can draw a focus/hover rect
             self.view.setMouseTracking(False)
             self.view.setFocusPolicy(Qt.NoFocus)
-        except Exception:
-            pass
 
         # Model
         self.model = QStandardItemModel(0, len(self.COLUMNS), self)

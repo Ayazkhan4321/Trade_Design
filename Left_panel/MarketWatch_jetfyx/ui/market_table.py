@@ -22,26 +22,38 @@ class MarketTable(QTableView):
         if not symbols:
             return
 
-        import time
-        for row, row_data in enumerate(self.model.rows):
-            if not isinstance(row_data, dict):
-                continue  # skip invalid/category rows
+        # Safety check: ensure model still exists (may have been deleted if widget was destroyed)
+        if not self.model or not hasattr(self.model, 'rows'):
+            return
 
-            symbol = row_data.get("symbol")
-            if symbol in symbols:
-                self.model.dataChanged.emit(
-                    self.model.index(row, 0),
-                    self.model.index(row, self.model.columnCount() - 1)
-                )
-                # If this is the expanded row, update the TradePanel
-                if self.expanded_row == row:
-                    panel = self.indexWidget(self.model.index(row, 0))
-                    if isinstance(panel, TradePanel):
-                        # Get latest prices from row_data
-                        sell = row_data.get("sell", "")
-                        buy = row_data.get("buy", "")
-                        # Pass timestamp for latency logging in TradePanel
-                        panel.update_prices(sell, buy, hub_received_timestamp=row_data.get('hub_received_timestamp'))
+        import time
+        try:
+            for row, row_data in enumerate(self.model.rows):
+                if not isinstance(row_data, dict):
+                    continue  # skip invalid/category rows
+
+                symbol = row_data.get("symbol")
+                if symbol in symbols:
+                    # Safety check before accessing model methods
+                    if not self.model or not hasattr(self.model, 'columnCount'):
+                        return
+                    
+                    self.model.dataChanged.emit(
+                        self.model.index(row, 0),
+                        self.model.index(row, self.model.columnCount() - 1)
+                    )
+                    # If this is the expanded row, update the TradePanel
+                    if self.expanded_row == row:
+                        panel = self.indexWidget(self.model.index(row, 0))
+                        if isinstance(panel, TradePanel):
+                            # Get latest prices from row_data
+                            sell = row_data.get("sell", "")
+                            buy = row_data.get("buy", "")
+                            # Pass timestamp for latency logging in TradePanel
+                            panel.update_prices(sell, buy, hub_received_timestamp=row_data.get('hub_received_timestamp'))
+        except RuntimeError:
+            # Model was deleted while we were updating - this is safe to ignore
+            pass
 
     # --------------------------------------------------
     # INIT

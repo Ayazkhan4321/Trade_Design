@@ -27,12 +27,64 @@ class MarketOrderForm(QWidget):
         self.buy_price = buy_price
         
         self.setup_ui(default_lot)
+        self._apply_theme()
+        
+        # Subscribe to dynamic theme changes
+        try:
+            from Theme.theme_manager import ThemeManager
+            ThemeManager.instance().theme_changed.connect(lambda n, t: self._apply_theme())
+        except Exception:
+            pass
+            
+    def _apply_theme(self):
+        """Apply dynamic theme colors instead of hardcoded hex values"""
+        try:
+            from Theme.theme_manager import ThemeManager
+            tok = ThemeManager.instance().tokens()
+            bg_input = tok.get("bg_input", "#f5f5f5")
+            text_pri = tok.get("text_primary", "#1a202c")
+            text_sec = tok.get("text_secondary", "#6b7280")
+            border   = tok.get("border_primary", "#e5e7eb")
+            is_dark  = tok.get("is_dark", "false") == "true"
+        except Exception:
+            bg_input, text_pri, text_sec, border, is_dark = "#f5f5f5", "#1a202c", "#6b7280", "#e5e7eb", False
+
+        # Force strong contrast in dark mode for better readability
+        if is_dark:
+            if border == "#e5e7eb": border = "#374151"
+            if bg_input == "#f5f5f5": bg_input = "#1f2937"
+
+        self.setStyleSheet(f"""
+            QWidget {{ background: transparent; }}
+            
+            QLabel#FormLabel {{
+                font-weight: bold; font-size: 12px; color: {text_sec};
+            }}
+            
+            QLabel#FormValue, QTextEdit {{
+                background-color: {bg_input};
+                border: 1px solid {border};
+                border-radius: 4px;
+                font-size: 13px;
+                color: {text_pri};
+                padding: 5px;
+            }}
+            
+            QLabel#InfoLabel {{
+                font-size: 11px; color: {text_sec};
+            }}
+            
+            QLabel#InfoValue {{
+                font-size: 11px; color: {text_pri}; font-weight: bold;
+            }}
+        """)
     
     def setup_ui(self, default_lot):
         """Setup the form UI"""
         layout = QVBoxLayout(self)
-        layout.setSpacing(15)
-        layout.setContentsMargins(15, 15, 15, 15)
+        # 🟢 FIX: Drastically reduced spacing and margins to remove empty space
+        layout.setSpacing(8)
+        layout.setContentsMargins(10, 10, 10, 10)
         
         # Volume, Contract Value, Margin row
         top_row = self._create_top_row(default_lot)
@@ -108,12 +160,14 @@ class MarketOrderForm(QWidget):
         row.setSpacing(10)
         
         self.sell_btn = QPushButton(f"{self.sell_price}\nSell")
-        self.sell_btn.setFixedHeight(80)
+        # 🟢 FIX: Reduced from 80 to 50 for a sleeker profile
+        self.sell_btn.setFixedHeight(50)
         self.sell_btn.setStyleSheet(BUTTON_STYLES['sell'])
         self.sell_btn.clicked.connect(lambda: self._submit_order("SELL"))
         
         self.buy_btn = QPushButton(f"{self.buy_price}\nBuy")
-        self.buy_btn.setFixedHeight(80)
+        # 🟢 FIX: Reduced from 80 to 50
+        self.buy_btn.setFixedHeight(50)
         self.buy_btn.setStyleSheet(BUTTON_STYLES['buy'])
         self.buy_btn.clicked.connect(lambda: self._submit_order("BUY"))
         
@@ -127,21 +181,15 @@ class MarketOrderForm(QWidget):
         container = QWidget()
         layout = QVBoxLayout(container)
         layout.setSpacing(5)
+        layout.setContentsMargins(0, 0, 0, 0)
         
         label = QLabel("Remarks")
-        label.setStyleSheet("font-weight: bold; font-size: 12px; color: #666;")
+        label.setObjectName("FormLabel")
         
         self.remarks_input = QTextEdit()
         self.remarks_input.setPlaceholderText("Remarks")
-        self.remarks_input.setFixedHeight(60)
-        self.remarks_input.setStyleSheet("""
-            QTextEdit {
-                border: 1px solid #ddd;
-                border-radius: 4px;
-                padding: 5px;
-                background: white;
-            }
-        """)
+        # 🟢 FIX: Reduced remarks height slightly
+        self.remarks_input.setFixedHeight(45)
         
         layout.addWidget(label)
         layout.addWidget(self.remarks_input)
@@ -165,11 +213,11 @@ class MarketOrderForm(QWidget):
             container.setSpacing(2)
             
             label = QLabel(label_text)
-            label.setStyleSheet("font-size: 11px; color: #999;")
+            label.setObjectName("InfoLabel")
             label.setAlignment(Qt.AlignCenter)
             
             value = QLabel(value_text)
-            value.setStyleSheet("font-size: 11px; color: #666; font-weight: bold;")
+            value.setObjectName("InfoValue")
             value.setAlignment(Qt.AlignCenter)
             
             container.addWidget(label)
@@ -185,21 +233,13 @@ class MarketOrderForm(QWidget):
         container.setSpacing(5)
         
         label = QLabel(label_text)
-        label.setStyleSheet("font-weight: bold; font-size: 12px; color: #666;")
+        label.setObjectName("FormLabel")
         
         value = QLabel(value_text)
+        value.setObjectName("FormValue")
         value.setAlignment(Qt.AlignCenter)
-        value.setFixedHeight(40)
-        value.setStyleSheet("""
-            QLabel {
-                background: #f5f5f5;
-                border: 1px solid #ddd;
-                border-radius: 4px;
-                font-size: 13px;
-                color: #333;
-                padding: 5px;
-            }
-        """)
+        # 🟢 FIX: Reduced height from 40 to 32
+        value.setFixedHeight(32)
         
         container.addWidget(label)
         container.addWidget(value)
