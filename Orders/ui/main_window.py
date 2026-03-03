@@ -186,7 +186,8 @@ QPushButton#OrdersSettingsBtn:hover, QPushButton#OrdersFunnelBtn:hover { backgro
             if hasattr(store, 'account_id_changed'):
                 store.account_id_changed.connect(self._on_account_id_changed)
                 LOG.debug("OrdersWidget connected to store.account_id_changed signal")
-            LOG.debug("OrdersWidget connected to store.account_changed")
+            else:
+                LOG.debug("OrdersWidget: store.account_id_changed signal not found, will rely on account_changed for OrderUpdatesService initialization")
         except Exception:
             LOG.exception("Failed to connect to account signals")
 

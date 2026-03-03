@@ -142,9 +142,21 @@ class OrderDock(QDockWidget):
                 try:
                     from .table_settings import OrderTableSettingsDialog, HistoryTableSettingsDialog
                     if active == "Order":
-                        dlg = OrderTableSettingsDialog(self)
+                        # if we can, provide direct reference to speed lookups
+                        try:
+                            tv = self.orders_widget.orders_tab.table.table_view
+                        except Exception:
+                            tv = None
+                        dlg = OrderTableSettingsDialog(self, table_view=tv)
                     else:
-                        dlg = HistoryTableSettingsDialog(self)
+                        # history dialog will now honour a table_view argument
+                        # just as the order dialog does – pass the history view
+                        try:
+                            # HistoryTable uses attribute `view` instead of `table`.
+                            tv = self.orders_widget.history_tab.view
+                        except Exception:
+                            tv = None
+                        dlg = HistoryTableSettingsDialog(self, table_view=tv)
                     dlg.exec()
                 except Exception:
                     QMessageBox.information(self, "Settings", f"Open settings for {active}")

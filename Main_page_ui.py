@@ -683,7 +683,14 @@ class Ui_MainWindow(object):
         self.toolBar.addAction(self.actionsearch)
         self.toolBar.addAction(self.actionMQL5_Community)
         self.toolBar.addAction(self.actionLevel)
+        # Spacer
+        spacer = QWidget()
+        spacer.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Preferred)
+        self.toolBar.addWidget(spacer)
         self.toolBar.addSeparator()
+
+        # Ye action right side chale jayega
+
         self.toolBar.addAction(self.actiontheme)
 
         self.retranslateUi(MainWindow)

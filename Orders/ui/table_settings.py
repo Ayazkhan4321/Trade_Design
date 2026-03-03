@@ -1,231 +1,406 @@
-from PySide6.QtWidgets import (
-    QDialog, QVBoxLayout, QLabel, QGridLayout, QCheckBox, QPushButton, QFrame
-)
-from PySide6.QtCore import Qt
-import base64
-import os
-import json
+"""
+table_settings.py
+=================
+Table Settings dialogs for Order and History tabs.
 
+Fix log
+-------
+* Use QCheckBox.toggled(bool) instead of stateChanged(int).
+  In PySide6, stateChanged emits a plain int (2/0), and comparing it
+  with Qt.Checked (a CheckState enum) always returns False → columns
+  never hid. toggled() emits a real Python bool so the fix is clean.
+* JSON files are stored next to this module (no ../.. path climbing).
+* DEFAULT = False  →  all columns hidden until the user enables them,
+  matching the unchecked UI the user sees.
+"""
+
+from __future__ import annotations
+
+import base64
+import json
+import logging
+import os
+from typing import Optional
+
+from PySide6.QtCore import Qt
+from PySide6.QtWidgets import (
+    QCheckBox, QDialog, QFrame, QGridLayout, QLabel, QVBoxLayout,
+)
+
+LOG = logging.getLogger(__name__)
+
+_HERE      = os.path.dirname(os.path.abspath(__file__))
+_ORDER_CFG = os.path.join(_HERE, "orders_table_settings.json")
+_HIST_CFG  = os.path.join(_HERE, "history_table_settings.json")
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Helpers
+# ─────────────────────────────────────────────────────────────────────────────
+
+def _svg_uri(size: int = 18) -> str:
+    svg = (
+        f"<svg xmlns='http://www.w3.org/2000/svg' width='{size}' height='{size}'"
+        f" viewBox='0 0 {size} {size}'>"
+        f"<rect rx='4' ry='4' width='{size}' height='{size}' fill='#2b7bd3'/>"
+        f"<path d='M{int(size*.25)} {int(size*.50)}"
+        f" L{int(size*.42)} {int(size*.67)}"
+        f" L{int(size*.75)} {int(size*.30)}'"
+        f" stroke='white' stroke-width='2' stroke-linecap='round'"
+        f" stroke-linejoin='round' fill='none'/></svg>"
+    )
+    return "data:image/svg+xml;base64," + base64.b64encode(svg.encode()).decode()
+
+
+def _qss(name: str, sz: int) -> str:
+    uri = _svg_uri(sz)
+    return (
+        f"QDialog#{name}{{background:white;border:2px solid #2b7bd3;border-radius:10px;}}"
+        f"QDialog#{name} QLabel{{color:#2e3640;}}"
+        f"QDialog#{name} QCheckBox::indicator{{width:{sz}px;height:{sz}px;}}"
+        f"QDialog#{name} QCheckBox::indicator:unchecked"
+        f"{{border:1.5px solid #b0b8c1;background:#fff;border-radius:4px;}}"
+        f"QDialog#{name} QCheckBox::indicator:checked"
+        f"{{image:url(\"{uri}\");border:1px solid #2b7bd3;border-radius:4px;}}"
+        f"QDialog#{name} QCheckBox{{padding:6px 10px;border-radius:8px;background:transparent;}}"
+    )
+
+
+def _col_index(tv, name: str) -> Optional[int]:
+    """Return column index matching *name* (case-insensitive, partial fallback)."""
+    try:
+        model = tv.model()
+        n = name.strip().lower()
+        count = model.columnCount()
+        # exact match
+        for i in range(count):
+            h = (model.headerData(i, Qt.Horizontal) or "").strip().lower()
+            if h == n:
+                return i
+        # partial match
+        for i in range(count):
+            h = (model.headerData(i, Qt.Horizontal) or "").strip().lower()
+            if n in h or h in n:
+                return i
+    except Exception as e:
+        LOG.debug("_col_index(%r): %s", name, e)
+    return None
+
+
+def _set_visible(tv, header: str, visible: bool) -> None:
+    """Show or hide a column by header name."""
+    idx = _col_index(tv, header)
+    if idx is None:
+        LOG.warning("Column not found: %r", header)
+        return
+    tv.setColumnHidden(idx, not visible)
+    LOG.debug("Column %r [%d] hidden=%s", header, idx, not visible)
+
+
+def _load(path: str, labels: list[str], default: bool) -> dict:
+    try:
+        with open(path, encoding="utf-8") as f:
+            data = json.load(f)
+        if not isinstance(data, dict):
+            data = {}
+    except Exception:
+        data = {}
+    changed = False
+    for lbl in labels:
+        if lbl not in data:
+            data[lbl] = default
+            changed = True
+    if changed:
+        _save(path, data)
+    return data
+
+
+def _save(path: str, data: dict) -> None:
+    try:
+        with open(path, "w", encoding="utf-8") as f:
+            json.dump(data, f, indent=2)
+    except Exception:
+        LOG.exception("Cannot save %s", path)
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# OrderTableSettingsDialog
+# ─────────────────────────────────────────────────────────────────────────────
 
 class OrderTableSettingsDialog(QDialog):
-    """Larger dialog (image1) for the live Orders tab.
-
-    Scoped by object name so app-wide styles are not affected.
     """
-    def __init__(self, parent=None):
+    Real-time column show/hide for the Orders table.
+
+    COLUMNS = list of (checkbox_label, model_header_string)
+    Model headers come from OrderModel.headers – adjust if yours differ.
+    Use debug_print_headers(tv) to inspect the exact strings at runtime.
+    """
+
+    COLUMNS: list[tuple[str, str]] = [
+        ("Entry Value",  "Entry Value"),
+        ("Commission",   "Commission"),
+        ("Market Value", "Market Value"),
+        ("Swap",         "SWAP"),
+        ("P/L in %",     "P/L IN %"),
+        ("Remarks",      "Remarks"),
+    ]
+
+    def __init__(self, parent=None, table_view=None):
         super().__init__(parent)
         self.setObjectName("OrderTableSettingsDialog")
-        self.setWindowTitle("Tabel Settings")
+        self.setWindowTitle("Table Settings")
         self.setModal(True)
-        self.setMinimumWidth(480)
+        self.setMinimumWidth(460)
+        self.setStyleSheet(_qss("OrderTableSettingsDialog", 18))
 
-        # blue rounded-check SVG
-        svg = (
-            "<svg xmlns='http://www.w3.org/2000/svg' width='18' height='18' viewBox='0 0 18 18'>"
-            "<rect rx='4' ry='4' width='18' height='18' fill='#2b7bd3'/>"
-            "<path d='M4.5 9.0 L7.5 12.0 L13.0 6.0' stroke='white' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round' fill='none'/>"
-            "</svg>"
-        )
-        svg_b64 = base64.b64encode(svg.encode('utf-8')).decode('ascii')
-        data_uri = f"data:image/svg+xml;base64,{svg_b64}"
-
-        # Scoped stylesheet (only affects this dialog)
-        self.setStyleSheet(
-            "QDialog#OrderTableSettingsDialog { background: white; border: 2px solid #2b7bd3; border-radius:10px; }\n"
-            "QDialog#OrderTableSettingsDialog QLabel { color: #2e3640; }\n"
-            "QDialog#OrderTableSettingsDialog QCheckBox::indicator { width:18px; height:18px; }\n"
-            "QDialog#OrderTableSettingsDialog QCheckBox::indicator:unchecked { border:1px solid #d0d6dc; background:transparent; border-radius:4px; }\n"
-            "QDialog#OrderTableSettingsDialog QCheckBox::indicator:checked { image: url(\"" + data_uri + "\"); background-color:#2b7bd3; border:1px solid #2b7bd3; border-radius:4px; }\n"
-            "QDialog#OrderTableSettingsDialog QCheckBox { padding:8px; border-radius:10px; background:transparent; }\n"
-            "QDialog#OrderTableSettingsDialog QCheckBox:checked { background: transparent; color: #222; }\n"
+        self._tv  = table_view          # direct reference – most reliable
+        self._cfg = _load(
+            _ORDER_CFG,
+            [lbl for lbl, _ in self.COLUMNS] + ["Multi-Target SL/TP"],
+            default=False,              # unchecked / hidden by default
         )
 
-        layout = QVBoxLayout(self)
-        layout.setContentsMargins(18, 18, 18, 18)
+        self._build()
+        self._apply_all()              # sync table to stored state on open
 
-        title = QLabel("Tabel Settings")
-        title.setStyleSheet("font-size:18px; font-weight:700;")
-        layout.addWidget(title)
+    # ── Build UI ──────────────────────────────────────────────────────────────
 
-        subtitle = QLabel("Customize your table display")
-        subtitle.setStyleSheet("color:gray;")
-        layout.addWidget(subtitle)
+    def _build(self):
+        lay = QVBoxLayout(self)
+        lay.setContentsMargins(18, 18, 18, 18)
+        lay.setSpacing(4)
 
-        vis_label = QLabel("VISIBLE OPTIONS")
-        vis_label.setStyleSheet("font-weight:700; color:#6e7480; margin-top:8px;")
-        layout.addWidget(vis_label)
+        t = QLabel("Table Settings")
+        t.setStyleSheet("font-size:18px;font-weight:700;")
+        lay.addWidget(t)
+
+        s = QLabel("Customize your table display")
+        s.setStyleSheet("color:gray;font-size:12px;")
+        lay.addWidget(s)
+
+        lv = QLabel("VISIBLE OPTIONS")
+        lv.setStyleSheet("font-weight:700;color:#6e7480;margin-top:10px;font-size:11px;")
+        lay.addWidget(lv)
 
         grid = QGridLayout()
         grid.setHorizontalSpacing(16)
-        grid.setVerticalSpacing(12)
+        grid.setVerticalSpacing(2)
 
-        options = [
-            "Entry Value",
-            "Commission",
-            "Market Value",
-            "Swap",
-            "P/L in %",
-            "Remark",
-        ]
+        for i, (label, header) in enumerate(self.COLUMNS):
+            cb = self._make_cb(label, header)
+            grid.addWidget(cb, i // 2, i % 2)
+        lay.addLayout(grid)
 
-        # persistence path (store per-workspace under project root)
-        proj_root = os.path.normpath(os.path.join(os.path.dirname(__file__), '..', '..'))
-        self._settings_path = os.path.join(proj_root, 'orders_table_settings.json')
-        try:
-            with open(self._settings_path, 'r', encoding='utf-8') as f:
-                self._settings = json.load(f)
-        except Exception:
-            self._settings = {}
+        sep = QFrame()
+        sep.setFrameShape(QFrame.HLine)
+        sep.setStyleSheet("color:#e6e9ec;margin-top:10px;margin-bottom:4px;")
+        lay.addWidget(sep)
 
-        # Ensure all options default to True when not present
-        defaults_added = False
-        for opt in options + ['Multi-Target SL/TP']:
-            if opt not in self._settings:
-                self._settings[opt] = True
-                defaults_added = True
-        if defaults_added:
+        lm = QLabel("\U0001F3C6  MASTER FEATURES")
+        lm.setStyleSheet("font-weight:700;color:#6e7480;font-size:11px;")
+        lay.addWidget(lm)
+
+        cb_m = QCheckBox("Multi-Target SL/TP")
+        cb_m.setChecked(bool(self._cfg.get("Multi-Target SL/TP", False)))
+        cb_m.setCursor(Qt.PointingHandCursor)
+        # feature-only toggle (no column to hide)
+        cb_m.toggled.connect(
+            lambda checked: self._persist_only("Multi-Target SL/TP", checked)
+        )
+        lay.addWidget(cb_m)
+
+    def _make_cb(self, label: str, header: str) -> QCheckBox:
+        cb = QCheckBox(label)
+        cb.blockSignals(True)
+        cb.setChecked(bool(self._cfg.get(label, False)))
+        cb.blockSignals(False)
+        cb.setCursor(Qt.PointingHandCursor)
+        # ↓ toggled(bool) – the CORRECT signal in PySide6 for true/false toggle
+        #   stateChanged(int) comparison with Qt.Checked enum was always False!
+        cb.toggled.connect(
+            lambda checked, lbl=label, hdr=header: self._on_toggle(lbl, hdr, checked)
+        )
+        return cb
+
+    # ── Slots ─────────────────────────────────────────────────────────────────
+
+    def _on_toggle(self, label: str, header: str, checked: bool) -> None:
+        """Called immediately when user ticks/unticks. checked is a real bool."""
+        # 1. Persist
+        self._cfg[label] = checked
+        _save(_ORDER_CFG, self._cfg)
+
+        # 2. Apply to table
+        tv = self._get_tv()
+        if tv is None:
+            LOG.warning("_on_toggle(%r): table_view is None", label)
+            return
+        _set_visible(tv, header, checked)
+
+    def _persist_only(self, key: str, checked: bool) -> None:
+        self._cfg[key] = checked
+        _save(_ORDER_CFG, self._cfg)
+
+    # ── Helpers ───────────────────────────────────────────────────────────────
+
+    def _get_tv(self):
+        if self._tv is not None:
+            return self._tv
+        # fallback: walk parent chain
+        p = self.parent()
+        while p is not None:
+            for path in (
+                ("orders_widget", "orders_tab", "table", "table_view"),
+                ("table", "table_view"),
+            ):
+                try:
+                    obj = p
+                    for attr in path:
+                        obj = getattr(obj, attr)
+                    if obj is not None:
+                        self._tv = obj
+                        return obj
+                except AttributeError:
+                    pass
             try:
-                with open(self._settings_path, 'w', encoding='utf-8') as f:
-                    json.dump(self._settings, f, indent=2)
+                p = p.parent()
             except Exception:
-                pass
+                break
+        return None
 
-        self._checkboxes = {}
-        for i, opt in enumerate(options):
-            cb = QCheckBox(opt)
-            default = True
-            val = self._settings.get(opt, default)
-            cb.setChecked(bool(val))
-            cb.setCursor(Qt.PointingHandCursor)
-            cb.stateChanged.connect(lambda st, key=opt: self._on_state_changed(key, st))
-            self._checkboxes[opt] = cb
-            r = i // 2
-            c = i % 2
-            grid.addWidget(cb, r, c)
+    def _apply_all(self):
+        """Sync every column's visibility to match the stored config."""
+        tv = self._get_tv()
+        if tv is None:
+            LOG.debug("_apply_all: table_view not available")
+            return
+        for label, header in self.COLUMNS:
+            _set_visible(tv, header, bool(self._cfg.get(label, False)))
 
-        layout.addLayout(grid)
 
-        line = QFrame()
-        line.setFrameShape(QFrame.HLine)
-        line.setStyleSheet("color:#e6e9ec; margin-top:10px; margin-bottom:10px;")
-        layout.addWidget(line)
-
-        crown_lbl = QLabel("\uD83C\uDFC6  MASTER FEATURES")
-        crown_lbl.setStyleSheet("font-weight:700; color:#6e7480;")
-        layout.addWidget(crown_lbl)
-
-        mcb = QCheckBox("Multi-Target SL/TP")
-        mcb.setChecked(bool(self._settings.get('Multi-Target SL/TP', True)))
-        mcb.setCursor(Qt.PointingHandCursor)
-        mcb.stateChanged.connect(lambda st, key='Multi-Target SL/TP': self._on_state_changed(key, st))
-        layout.addWidget(mcb)
-
-    def _on_state_changed(self, key, state):
-        try:
-            self._settings[key] = bool(state == Qt.Checked)
-            with open(self._settings_path, 'w', encoding='utf-8') as f:
-                json.dump(self._settings, f, indent=2)
-        except Exception:
-            pass
-
+# ─────────────────────────────────────────────────────────────────────────────
+# HistoryTableSettingsDialog
+# ─────────────────────────────────────────────────────────────────────────────
 
 class HistoryTableSettingsDialog(QDialog):
-    """Compact dialog (image2) for History tab.
-    """
-    def __init__(self, parent=None):
+    """Real-time column show/hide for the History table."""
+
+    COLUMNS: list[tuple[str, str]] = [
+        ("Entry Value",  "Entry Value"),
+        ("Commission",   "Commission"),
+        ("Closed Value", "Closed Value"),
+        ("Swap",         "SWAP"),
+        ("P/L in %",     "P/L IN %"),
+        ("Remark",       "Remark"),
+    ]
+
+    def __init__(self, parent=None, table_view=None):
         super().__init__(parent)
         self.setObjectName("HistoryTableSettingsDialog")
-        self.setWindowTitle("Tabel Settings")
+        self.setWindowTitle("Table Settings")
         self.setModal(True)
         self.setMinimumWidth(360)
+        self.setStyleSheet(_qss("HistoryTableSettingsDialog", 16))
 
-        # SVG checkmark for history dialog (smaller)
-        svg = (
-            "<svg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 16 16'>"
-            "<rect rx='4' ry='4' width='16' height='16' fill='#2b7bd3'/>"
-            "<path d='M4 8 L6.5 11 L12 5' stroke='white' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round' fill='none'/>"
-            "</svg>"
-        )
-        svg_b64 = base64.b64encode(svg.encode('utf-8')).decode('ascii')
-        data_uri = f"data:image/svg+xml;base64,{svg_b64}"
-
-        self.setStyleSheet(
-            "QDialog#HistoryTableSettingsDialog { background: white; border: 2px solid #2b7bd3; border-radius:12px; }\n"
-            "QDialog#HistoryTableSettingsDialog QCheckBox::indicator { width:16px; height:16px; }\n"
-            "QDialog#HistoryTableSettingsDialog QCheckBox::indicator:unchecked { border:1px solid #d0d6dc; background:transparent; border-radius:4px; }\n"
-            "QDialog#HistoryTableSettingsDialog QCheckBox::indicator:checked { image: url(\"" + data_uri + "\"); background-color:#2b7bd3; border:1px solid #2b7bd3; border-radius:4px; }\n"
-            "QDialog#HistoryTableSettingsDialog QCheckBox { padding:8px; border-radius:10px; background:transparent; }\n"
-            "QDialog#HistoryTableSettingsDialog QCheckBox:checked { background: transparent; color: #222; }\n"
+        self._tv  = table_view
+        self._cfg = _load(
+            _HIST_CFG,
+            [lbl for lbl, _ in self.COLUMNS],
+            default=False,
         )
 
-        layout = QVBoxLayout(self)
-        layout.setContentsMargins(14, 14, 14, 14)
+        self._build()
+        self._apply_all()
 
-        title = QLabel("Tabel Settings")
-        title.setStyleSheet("font-size:16px; font-weight:700;")
-        layout.addWidget(title)
+    def _build(self):
+        lay = QVBoxLayout(self)
+        lay.setContentsMargins(14, 14, 14, 14)
+        lay.setSpacing(4)
 
-        subtitle = QLabel("Customize display")
-        subtitle.setStyleSheet("color:gray;")
-        layout.addWidget(subtitle)
+        t = QLabel("Table Settings")
+        t.setStyleSheet("font-size:16px;font-weight:700;")
+        lay.addWidget(t)
 
-        vis_label = QLabel("VISIBLE OPTIONS")
-        vis_label.setStyleSheet("font-weight:700; color:#6e7480; margin-top:8px;")
-        layout.addWidget(vis_label)
+        s = QLabel("Customize display")
+        s.setStyleSheet("color:gray;font-size:12px;")
+        lay.addWidget(s)
+
+        lv = QLabel("VISIBLE OPTIONS")
+        lv.setStyleSheet("font-weight:700;color:#6e7480;margin-top:8px;font-size:11px;")
+        lay.addWidget(lv)
 
         grid = QGridLayout()
-        options = [
-            "Entry Value",
-            "Commission",
-            "Closed Value",
-            "Swap",
-            "P/L in %",
-            "Remarks",
-        ]
-        # history settings persistence
-        proj_root = os.path.normpath(os.path.join(os.path.dirname(__file__), '..', '..'))
-        self._hist_settings_path = os.path.join(proj_root, 'history_table_settings.json')
-        try:
-            with open(self._hist_settings_path, 'r', encoding='utf-8') as f:
-                hist_settings = json.load(f)
-        except Exception:
-            hist_settings = {}
+        for i, (label, header) in enumerate(self.COLUMNS):
+            cb = self._make_cb(label, header)
+            grid.addWidget(cb, i // 2, i % 2)
+        lay.addLayout(grid)
 
-        # Ensure history options default to True
-        hist_defaults_added = False
-        for opt in options:
-            if opt not in hist_settings:
-                hist_settings[opt] = True
-                hist_defaults_added = True
-        if hist_defaults_added:
+    def _make_cb(self, label: str, header: str) -> QCheckBox:
+        cb = QCheckBox(label)
+        cb.blockSignals(True)
+        cb.setChecked(bool(self._cfg.get(label, False)))
+        cb.blockSignals(False)
+        cb.setCursor(Qt.PointingHandCursor)
+        cb.toggled.connect(
+            lambda checked, lbl=label, hdr=header: self._on_toggle(lbl, hdr, checked)
+        )
+        return cb
+
+    def _on_toggle(self, label: str, header: str, checked: bool) -> None:
+        self._cfg[label] = checked
+        _save(_HIST_CFG, self._cfg)
+        tv = self._get_tv()
+        if tv is None:
+            LOG.warning("_on_toggle(%r): history table_view is None", label)
+            return
+        _set_visible(tv, header, checked)
+
+    def _get_tv(self):
+        if self._tv is not None:
+            return self._tv
+        p = self.parent()
+        while p is not None:
+            for path in (
+                ("orders_widget", "history_tab", "view"),
+                ("orders_widget", "history_tab", "table_view"),
+                ("table", "table_view"),
+            ):
+                try:
+                    obj = p
+                    for attr in path:
+                        obj = getattr(obj, attr)
+                    if obj is not None:
+                        self._tv = obj
+                        return obj
+                except AttributeError:
+                    pass
             try:
-                with open(self._hist_settings_path, 'w', encoding='utf-8') as f:
-                    json.dump(hist_settings, f, indent=2)
+                p = p.parent()
             except Exception:
-                pass
+                break
+        return None
 
-        for i, opt in enumerate(options):
-            cb = QCheckBox(opt)
-            cb.setChecked(bool(hist_settings.get(opt, True)))
-            cb.setCursor(Qt.PointingHandCursor)
-            cb.stateChanged.connect(lambda st, key=opt: self._on_history_state_changed(key, st))
-            r = i // 2
-            c = i % 2
-            grid.addWidget(cb, r, c)
+    def _apply_all(self):
+        tv = self._get_tv()
+        if tv is None:
+            return
+        for label, header in self.COLUMNS:
+            _set_visible(tv, header, bool(self._cfg.get(label, False)))
 
-        layout.addLayout(grid)
 
-    def _on_history_state_changed(self, key, state):
-        try:
-            try:
-                with open(self._hist_settings_path, 'r', encoding='utf-8') as f:
-                    hist = json.load(f)
-            except Exception:
-                hist = {}
-            hist[key] = bool(state == Qt.Checked)
-            with open(self._hist_settings_path, 'w', encoding='utf-8') as f:
-                json.dump(hist, f, indent=2)
-        except Exception:
-            pass
+# ─────────────────────────────────────────────────────────────────────────────
+# Debug helper
+# ─────────────────────────────────────────────────────────────────────────────
 
-        
+def debug_print_headers(table_view) -> None:
+    """Print all column indices + header strings. Call once to verify names."""
+    try:
+        model = table_view.model()
+        count = model.columnCount()
+        print(f"\n{'='*52}\nTABLE HEADERS ({count} columns)\n{'='*52}")
+        for i in range(count):
+            h = model.headerData(i, Qt.Horizontal)
+            print(f"  [{i:2d}]  {repr(h):35s}  hidden={table_view.isColumnHidden(i)}")
+        print("=" * 52)
+    except Exception as exc:
+        print(f"debug_print_headers error: {exc}")
