@@ -40,5 +40,9 @@
   "tests/test_forgot_password_ui.py::test_retry_prompt_and_retry_action",
   "tests/test_forgot_password_ui.py::test_threaded_flow",
   "tests/test_forgot_password_ui.py::test_worker_run_invokes_service",
-  "tests/test_migration.py::test_migrate_legacy_files"
+  "tests/test_migration.py::test_migrate_legacy_files",
+  "tests/test_table_settings.py::test_checkbox_hides_column",
+  "tests/test_table_settings.py::test_history_widget_toggle",
+  "tests/test_table_settings.py::test_legacy_key_converted",
+  "tests/test_table_settings.py::test_real_widget_toggle"
 ]

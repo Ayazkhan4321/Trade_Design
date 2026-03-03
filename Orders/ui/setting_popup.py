@@ -43,3 +43,4 @@ def open_table_settings(self):
         print("Commission:", dlg.commission_cb.isChecked())
         print("Swap:", dlg.swap_cb.isChecked())
         print("Remark:", dlg.remark_cb.isChecked())
+    

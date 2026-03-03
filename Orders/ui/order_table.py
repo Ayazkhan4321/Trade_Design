@@ -242,3 +242,4 @@ class OrderTable(QWidget):
         except Exception:
             pass
         return super().eventFilter(obj, event)
+    
