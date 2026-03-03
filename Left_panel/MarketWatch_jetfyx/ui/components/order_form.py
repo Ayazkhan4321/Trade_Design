@@ -25,11 +25,86 @@ class OrderForm(QWidget):
         self.buy_price = buy_price
         
         self.setup_ui(default_lot)
-    
+        self._apply_theme()
+        
+        try:
+            from Theme.theme_manager import ThemeManager
+            ThemeManager.instance().theme_changed.connect(lambda n, t: self._apply_theme())
+        except Exception:
+            pass
+            
+    def _apply_theme(self):
+        """Apply dynamic theme colors and fix volume buttons UI"""
+        try:
+            from Theme.theme_manager import ThemeManager
+            tok = ThemeManager.instance().tokens()
+            bg_input = tok.get("bg_input", "#f5f5f5")
+            text_pri = tok.get("text_primary", "#1a202c")
+            text_sec = tok.get("text_secondary", "#6b7280")
+            border   = tok.get("border_primary", "#e5e7eb")
+            bg_hover = tok.get("bg_button_hover", "#e2e8f0")
+            is_dark  = tok.get("is_dark", "false") == "true"
+        except Exception:
+            bg_input, text_pri, text_sec, border, bg_hover, is_dark = "#f5f5f5", "#1a202c", "#6b7280", "#e5e7eb", "#e2e8f0", False
+
+        if is_dark:
+            if border == "#e5e7eb": border = "#374151"
+            if bg_input == "#f5f5f5": bg_input = "#1f2937"
+            if bg_hover == "#e2e8f0": bg_hover = "#4a5568"
+
+        self.setStyleSheet(f"""
+            QWidget {{ background: transparent; }}
+            
+            QLabel#FormLabel {{
+                font-weight: bold; font-size: 12px; color: {text_sec};
+            }}
+            
+            QLineEdit, QTextEdit {{
+                background-color: {bg_input};
+                border: 1px solid {border};
+                border-radius: 4px;
+                color: {text_pri};
+                padding: 5px;
+            }}
+            
+            /* Sleek stitched Volume Control Styling */
+            QPushButton#VolBtn {{
+                background-color: {bg_input};
+                border: 1px solid {border};
+                color: {text_pri};
+                font-weight: bold;
+                font-size: 12px;
+            }}
+            QPushButton#VolBtn:hover {{
+                background-color: {bg_hover};
+            }}
+            QDoubleSpinBox#VolInput {{
+                background-color: {bg_input};
+                border-top: 1px solid {border};
+                border-bottom: 1px solid {border};
+                border-left: none;
+                border-right: none;
+                color: {text_pri};
+                border-radius: 0px;
+            }}
+            QDoubleSpinBox#VolInput::up-button, QDoubleSpinBox#VolInput::down-button {{
+                width: 0px; /* Hide default arrows */
+            }}
+            
+            QLabel#InfoLabel {{
+                font-size: 11px; color: {text_sec};
+            }}
+            QLabel#InfoValue {{
+                font-size: 11px; color: {text_pri}; font-weight: bold;
+            }}
+        """)
+
     def setup_ui(self, default_lot):
         """Setup the form UI"""
         layout = QVBoxLayout(self)
-        layout.setSpacing(15)
+        # 🟢 FIX: Drastically reduced spacing and margins
+        layout.setSpacing(8)
+        layout.setContentsMargins(10, 10, 10, 10)
         
         # Volume row
         volume_row = self._create_volume_row(default_lot)
@@ -59,25 +134,29 @@ class OrderForm(QWidget):
         # Volume control
         vol_container = QVBoxLayout()
         vol_label = QLabel("Volume")
-        vol_label.setStyleSheet("font-weight: bold; font-size: 12px; color: #666;")
+        vol_label.setObjectName("FormLabel")
         
+        # 🟢 FIX: Stitched Volume Control
         vol_control = QHBoxLayout()
+        vol_control.setSpacing(0)
+        
         vol_down = QPushButton("▼")
-        vol_down.setFixedSize(*SIZES['button_medium'])
-        vol_down.setStyleSheet(BUTTON_STYLES['standard'])
+        vol_down.setObjectName("VolBtn")
+        vol_down.setFixedSize(30, 32)
         
         self.volume_input = QDoubleSpinBox()
+        self.volume_input.setObjectName("VolInput")
         self.volume_input.setDecimals(2)
         self.volume_input.setMinimum(0.01)
         self.volume_input.setMaximum(100.0)
         self.volume_input.setSingleStep(0.01)
         self.volume_input.setValue(default_lot)
         self.volume_input.setAlignment(Qt.AlignCenter)
-        self.volume_input.setFixedHeight(SIZES['input_height'])
+        self.volume_input.setFixedHeight(32)
         
         vol_up = QPushButton("▲")
-        vol_up.setFixedSize(*SIZES['button_medium'])
-        vol_up.setStyleSheet(BUTTON_STYLES['standard'])
+        vol_up.setObjectName("VolBtn")
+        vol_up.setFixedSize(30, 32)
         
         vol_down.clicked.connect(lambda: self.volume_input.setValue(max(0.01, self.volume_input.value() - 0.01)))
         vol_up.clicked.connect(lambda: self.volume_input.setValue(min(100.0, self.volume_input.value() + 0.01)))
@@ -99,11 +178,13 @@ class OrderForm(QWidget):
         
         self.sl_input = QLineEdit("Stop Loss")
         self.sl_input.setAlignment(Qt.AlignCenter)
-        self.sl_input.setFixedHeight(SIZES['input_height'])
+        # 🟢 FIX: Reduced height from 40 to 32
+        self.sl_input.setFixedHeight(32)
         
         self.tp_input = QLineEdit("Take Profit")
         self.tp_input.setAlignment(Qt.AlignCenter)
-        self.tp_input.setFixedHeight(SIZES['input_height'])
+        # 🟢 FIX: Reduced height from 40 to 32
+        self.tp_input.setFixedHeight(32)
         
         row.addWidget(self.sl_input)
         row.addWidget(self.tp_input)
@@ -113,14 +194,17 @@ class OrderForm(QWidget):
     def _create_buttons_row(self):
         """Create Buy/Sell buttons"""
         row = QHBoxLayout()
+        row.setSpacing(10)
         
         self.sell_btn = QPushButton(f"{self.sell_price}\nSell")
-        self.sell_btn.setFixedHeight(80)
+        # 🟢 FIX: Reduced height from 80 to 50
+        self.sell_btn.setFixedHeight(50)
         self.sell_btn.setStyleSheet(BUTTON_STYLES['sell'])
         self.sell_btn.clicked.connect(lambda: self._submit_order("SELL"))
         
         self.buy_btn = QPushButton(f"{self.buy_price}\nBuy")
-        self.buy_btn.setFixedHeight(80)
+        # 🟢 FIX: Reduced height from 80 to 50
+        self.buy_btn.setFixedHeight(50)
         self.buy_btn.setStyleSheet(BUTTON_STYLES['buy'])
         self.buy_btn.clicked.connect(lambda: self._submit_order("BUY"))
         
@@ -134,13 +218,15 @@ class OrderForm(QWidget):
         container = QWidget()
         layout = QVBoxLayout(container)
         layout.setSpacing(5)
+        layout.setContentsMargins(0, 0, 0, 0)
         
         label = QLabel("Remarks")
-        label.setStyleSheet("font-weight: bold; font-size: 12px; color: #666;")
+        label.setObjectName("FormLabel")
         
         self.remarks_input = QTextEdit()
         self.remarks_input.setPlaceholderText("Remarks")
-        self.remarks_input.setFixedHeight(60)
+        # 🟢 FIX: Reduced remarks height
+        self.remarks_input.setFixedHeight(45)
         
         layout.addWidget(label)
         layout.addWidget(self.remarks_input)
@@ -150,6 +236,7 @@ class OrderForm(QWidget):
     def _create_info_row(self):
         """Create info labels row"""
         row = QHBoxLayout()
+        row.setSpacing(15)
         
         info_labels = [
             ("Spread", "0.00"),
@@ -160,11 +247,13 @@ class OrderForm(QWidget):
         
         for label_text, value_text in info_labels:
             container = QVBoxLayout()
+            container.setSpacing(0)
+            
             label = QLabel(label_text)
-            label.setStyleSheet("font-size: 11px; color: #999;")
+            label.setObjectName("InfoLabel")
             label.setAlignment(Qt.AlignCenter)
             value = QLabel(value_text)
-            value.setStyleSheet("font-size: 11px; color: #666; font-weight: bold;")
+            value.setObjectName("InfoValue")
             value.setAlignment(Qt.AlignCenter)
             container.addWidget(label)
             container.addWidget(value)

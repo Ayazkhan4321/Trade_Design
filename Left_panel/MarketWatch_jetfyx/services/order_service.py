@@ -1,4 +1,3 @@
-
 """Order Service - handles placing orders via API and notifying listeners."""
 
 from . import __name__ as _svc
@@ -292,8 +291,14 @@ class OrderService:
             LOG.warning("cancel_order called without order_id")
             return False
 
-        url = API_ORDERS_CLOSE.format(orderId=order_id)
-        payload = { 'id': int(order_id), 'status': 1 }
+        # Safely parse ID to ensure the backend receives the exact type it expects
+        try:
+            oid = int(float(order_id))
+        except Exception:
+            oid = order_id
+
+        url = API_ORDERS_CLOSE.format(orderId=oid)
+        payload = { 'id': oid, 'status': 1 }
 
         headers = {}
         try:
@@ -305,15 +310,17 @@ class OrderService:
         headers.setdefault('Referer', API_BASE_URL)
 
         try:
-            LOG.info("Closing order %s via %s payload=%s", order_id, url, payload)
+            LOG.info("Closing order %s via %s payload=%s", oid, url, payload)
             resp = requests.put(url, json=payload, headers=headers, timeout=API_TIMEOUT, verify=API_VERIFY_TLS)
             LOG.info("Order close response: status=%s", getattr(resp, 'status_code', None))
+            
             if resp is None:
-                LOG.error("No response when attempting to close order %s", order_id)
+                LOG.error("No response when attempting to close order %s", oid)
                 return False
 
-            if resp.status_code not in (200, 202):
-                LOG.error("Failed to close order %s: status=%s text=%s", order_id, getattr(resp, 'status_code', None), getattr(resp, 'text', None))
+            # Accept ALL 2xx success codes (200, 201, 202, 204)
+            if not (200 <= resp.status_code < 300):
+                LOG.error("Failed to close order %s: status=%s text=%s", oid, getattr(resp, 'status_code', None), getattr(resp, 'text', None))
                 return False
 
             try:
@@ -329,10 +336,10 @@ class OrderService:
             # Update local cache if server returned the closed order
             if isinstance(item, dict):
                 try:
-                    oid = int(item.get('id') or item.get('orderId') or order_id)
+                    returned_oid = int(item.get('id') or item.get('orderId') or oid)
                     for o in self.active_orders:
                         try:
-                            if int(o.get('id') or 0) == int(oid):
+                            if int(o.get('id') or 0) == int(returned_oid):
                                 o['status'] = item.get('status') or o.get('status') or 'Closed'
                                 o['market_price'] = float(item.get('marketPrice') or o.get('market_price') or 0)
                                 o['market_value'] = float(item.get('marketValue') or o.get('market_value') or 0)
@@ -343,14 +350,14 @@ class OrderService:
                                 except Exception:
                                     o['pl'] = o.get('pl', 0)
                                 try:
-                                    self._notify_listeners({'id': oid, 'closed': True, 'payload': item})
+                                    self._notify_listeners({'id': returned_oid, 'closed': True, 'payload': item})
                                 except Exception:
                                     pass
                                 break
                         except Exception:
-                            LOG.exception("Error updating order entry in cache for %s", order_id)
+                            LOG.exception("Error updating order entry in cache for %s", returned_oid)
                 except Exception:
-                    LOG.exception("Failed updating local cache after close for %s", order_id)
+                    LOG.exception("Failed updating local cache after close for %s", returned_oid)
 
             return True
         except Exception:
@@ -437,7 +444,7 @@ class OrderService:
 
                     order = {
                         'id': item.get('id') or item.get('orderId') or 0,
-                        'time': item.get('createdAt') or item.get('time') or '',
+                        'time': item.get('createdAt') or item.get('orderClosedAt') or item.get('closed_time') or item.get('closedDate') or '',
                         'type': item.get('orderType') or item.get('type') or '',
                         'symbol': item.get('symbol') or '',
                         'lot': lot,

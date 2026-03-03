@@ -1,4 +1,5 @@
 from PySide6.QtCore import QAbstractTableModel, Qt, QModelIndex
+from PySide6.QtGui import QColor  # 🟢 FIX: Added QColor for painting the text!
 import logging
 
 LOG = logging.getLogger(__name__)
@@ -65,12 +66,30 @@ class OrderModel(QAbstractTableModel):
         if role == Qt.TextAlignmentRole:
             return Qt.AlignCenter
 
+        # 🟢 FIX: Dynamic Theme Colors injected directly into the table text!
         if role == Qt.ForegroundRole:
+            try:
+                from Theme.theme_manager import ThemeManager
+                tok = ThemeManager.instance().tokens()
+                accent = QColor(tok.get("accent", "#1976d2"))
+                text_pri = QColor(tok.get("text_primary", "#1a202c"))
+            except Exception:
+                accent = QColor("#1976d2")
+                text_pri = QColor("#1a202c")
+
             if column in ["PROFIT/LOSS", "P/L IN %"]:
                 try:
-                    return Qt.green if float(order.get("pl", 0)) > 0 else Qt.red
+                    val = float(order.get("pl", 0))
+                    # Keeps your clean trading Green and Red
+                    return QColor("#22c55e") if val >= 0 else QColor("#ef4444")
                 except Exception:
-                    return None
+                    return text_pri
+            
+            # 🟢 Apply the beautiful Theme Accent Color to Names and Identifiers!
+            elif column in ["Symbol", "Type", "ID"]:
+                return accent
+            else:
+                return text_pri
 
         return None
 
@@ -84,6 +103,7 @@ class OrderModel(QAbstractTableModel):
         if role == Qt.DisplayRole and orientation == Qt.Horizontal:
             return self.headers[section]
         return None
+
     def add_order(self, order: dict):
         """Append a new order dict and notify views.
 
@@ -127,7 +147,6 @@ class OrderModel(QAbstractTableModel):
         self.orders.append(order)
         self.endInsertRows()
         LOG.info("OrderModel added order id=%s symbol=%s total_rows=%s", order.get('id'), order.get('symbol'), len(self.orders))
-  
 
     def remove_order_by_id(self, order_id):
         """Remove an order from the model by its id (if present) and notify views."""
@@ -149,11 +168,11 @@ class OrderModel(QAbstractTableModel):
                 LOG.exception("Failed removing order id=%s at index %s", oid, idx)
         return False
 
-
     def clear_orders(self):
         self.beginResetModel()
         self.orders = []
         self.endResetModel()
+
     def update_market_price(self, symbol: str, sell: str, buy: str):
         """Update market_price for all orders matching `symbol`.
 

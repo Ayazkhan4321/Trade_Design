@@ -54,20 +54,35 @@ class OrderTable(QWidget):
         except Exception:
             pass
 
-        # Disable hover background so cells don't show a blue hover
-        # (app-wide styles may enable hover; override here to make it transparent)
+        # Disable hover background and enforce selection color from theme
         try:
-            # Prevent hover showing editable/focus caret; keep rows selectable.
+            from Theme.theme_manager import ThemeManager
+            t = ThemeManager.instance().tokens()
             self.table_view.setFocusPolicy(Qt.NoFocus)
             self.table_view.setStyleSheet(
-                """
-                QTableView::item:hover { background: transparent; }
-                QTableView::item:focus { outline: none; }
-                QTableView::item:selected { background: #0b66a6; color: #fff; }
-                """
+                f"QTableView::item:hover {{ background: {t['bg_row_hover']}; }}"
+                f"QTableView::item:focus {{ outline: none; }}"
+                f"QTableView::item:selected {{ background: {t['bg_selected']}; color: {t['text_selected']}; }}"
             )
+            # Re-apply on theme change
+            def _on_theme_changed_order_table(name, tok, tv=self.table_view):
+                try:
+                    tv.setStyleSheet(
+                        f"QTableView::item:hover {{ background: {tok['bg_row_hover']}; }}"
+                        f"QTableView::item:focus {{ outline: none; }}"
+                        f"QTableView::item:selected {{ background: {tok['bg_selected']}; color: {tok['text_selected']}; }}"
+                    )
+                except RuntimeError:
+                    # Widget was deleted, ignore
+                    pass
+            ThemeManager.instance().theme_changed.connect(_on_theme_changed_order_table)
         except Exception:
-            pass
+            self.table_view.setFocusPolicy(Qt.NoFocus)
+            self.table_view.setStyleSheet(
+                "QTableView::item:hover { background: transparent; }"
+                "QTableView::item:focus { outline: none; }"
+                "QTableView::item:selected { background: #0b66a6; color: #fff; }"
+            )
 
         self.table_view.verticalHeader().setVisible(False)
         # allow scrolling when rows exceed visible area
@@ -87,9 +102,9 @@ class OrderTable(QWidget):
         # ❌ DO NOT stretch last section
         # header.setStretchLastSection(True)  <-- REMOVED
 
-        # Default behavior for all columns
-        header.setSectionResizeMode(QHeaderView.Interactive)
-        header.setMinimumSectionSize(80)
+        # 🟢 FIX: Set to ResizeToContents so it perfectly hugs the text and removes wasted space!
+        header.setSectionResizeMode(QHeaderView.ResizeToContents)
+        header.setMinimumSectionSize(40)
         header.setDefaultAlignment(Qt.AlignCenter)
         header.setFixedHeight(28)
 
@@ -144,21 +159,15 @@ class OrderTable(QWidget):
         header.setSectionResizeMode(action_col, QHeaderView.Fixed)
         header.setSectionResizeMode(remark_col, QHeaderView.Fixed)
 
-        self.table_view.setColumnWidth(action_col, 40)
-        self.table_view.setColumnWidth(remark_col, 40)
+        # 🟢 FIX: Increased column widths from 50 to 90 so the full header words are perfectly visible!
+        self.table_view.setColumnWidth(action_col, 90)
+        self.table_view.setColumnWidth(remark_col, 80)
 
         # -----------------------------
         # Important column widths
         # -----------------------------
-        def set_width(name, width):
-            header.resizeSection(headers.index(name), width)
-
-        set_width("Market Price", 120)
-        set_width("Market Value", 120)
-        set_width("PROFIT/LOSS", 120)
-        set_width("P/L IN %", 100)
-        set_width("Commission", 100)
-        set_width("SWAP", 80)
+        # 🟢 FIX: Removed the massive hardcoded column widths (`set_width("Market Price", 120)` etc).
+        # ResizeToContents handles everything cleanly automatically now.
 
         # -----------------------------
         # Bottom bar (column-aware)
@@ -242,4 +251,3 @@ class OrderTable(QWidget):
         except Exception:
             pass
         return super().eventFilter(obj, event)
-    

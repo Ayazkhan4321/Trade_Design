@@ -28,34 +28,56 @@ class SearchDropdown(QWidget):
         self.setAttribute(Qt.WA_ShowWithoutActivating, True)
         self.setFocusPolicy(Qt.NoFocus)
 
-        self.setStyleSheet("""
-            QWidget {
-                background: white;
-                border: 1px solid #ccc;
-            }
-            QListWidget {
+    def _apply_theme(self):
+        """Apply theme-aware styles."""
+        try:
+            from Theme.theme_manager import ThemeManager
+            t = ThemeManager.instance().tokens()
+            bg     = t.get("bg_popup",      "#ffffff")
+            border = t.get("border_primary", "#e5e7eb")
+            hover  = t.get("bg_row_hover",   "#f0f4f8")
+            text   = t.get("text_primary",   "#1a202c")
+        except Exception:
+            bg="#ffffff"; border="#ccc"; hover="#f0f0f0"; text="#111"
+
+        self.setStyleSheet(f"""
+            QWidget {{
+                background: {bg};
+                border: 1px solid {border};
+                border-radius: 6px;
+            }}
+            QListWidget {{
                 border: none;
-            }
-            QListWidget::item {
+                background: {bg};
+            }}
+            QListWidget::item {{
                 padding: 6px;
-            }
-            QListWidget::item:hover {
-                background: #f0f0f0;
-            }
+                color: {text};
+            }}
+            QListWidget::item:hover {{
+                background: {hover};
+            }}
         """)
+        return bg, border, hover, text
 
         layout = QVBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)
 
         self.list = QListWidget()
         self.list.setUniformItemSizes(True)
-        # Prevent mouse events from propagating and stealing focus
         self.list.setAttribute(Qt.WA_NoMousePropagation, True)
-        # Keep keyboard focus on the search input; list should not take focus
         self.list.setFocusPolicy(Qt.NoFocus)
         layout.addWidget(self.list)
 
         self.list.itemClicked.connect(self._on_item_clicked)
+
+        # Apply theme and subscribe to changes
+        self._apply_theme()
+        try:
+            from Theme.theme_manager import ThemeManager
+            ThemeManager.instance().theme_changed.connect(lambda n, t: self._apply_theme())
+        except Exception:
+            pass
 
     # -------------------------
     # Public API
@@ -65,6 +87,14 @@ class SearchDropdown(QWidget):
 
         from PySide6.QtWidgets import QWidget, QHBoxLayout, QLabel, QPushButton
 
+        # Get current theme colors
+        try:
+            from Theme.theme_manager import ThemeManager
+            t = ThemeManager.instance().tokens()
+            text_color = t.get("text_primary", "#1a202c")
+        except Exception:
+            text_color = "#111"
+
         for sym in results:
             symbol = sym.get("symbol")
             desc = sym.get("name") or sym.get("description", "")
@@ -73,22 +103,22 @@ class SearchDropdown(QWidget):
             item = QListWidgetItem()
             item.setData(Qt.UserRole, symbol)
 
-            # Create widget for item: label on left, star button on right
             w = QWidget()
             h = QHBoxLayout(w)
             h.setContentsMargins(8, 4, 8, 4)
             h.setSpacing(8)
 
             lbl = QLabel(f"{symbol} - {desc}" if desc else symbol)
-            lbl.setStyleSheet("color: #111; font-size: 14px;")
+            lbl.setStyleSheet(f"color: {text_color}; font-size: 13px; background: transparent;")
             star_btn = QPushButton("★" if is_fav else "☆")
             star_btn.setFlat(True)
-            star_btn.setStyleSheet(f"color: {'#ffa500' if is_fav else '#999'}; background: transparent; border: none; font-size: 16px;")
+            star_btn.setStyleSheet(
+                f"color: {'#ffa500' if is_fav else '#aaa'}; "
+                "background: transparent; border: none; font-size: 16px;"
+            )
             star_btn.setFixedSize(24, 24)
-            # Clicking the star should not steal keyboard focus from the search input
             star_btn.setFocusPolicy(Qt.NoFocus)
 
-            # Connect star toggle
             def make_toggle(s):
                 def _toggle():
                     if self.symbol_manager.is_favorite(s):
@@ -130,5 +160,3 @@ class SearchDropdown(QWidget):
         super().showEvent(event)
         # Do NOT steal focus from the search input; keep typing working
         pass
-
-

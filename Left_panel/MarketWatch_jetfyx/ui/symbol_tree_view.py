@@ -1,4 +1,4 @@
-from PySide6.QtWidgets import QTreeWidget, QTreeWidgetItem, QPushButton, QHBoxLayout, QWidget
+from PySide6.QtWidgets import QTreeWidget, QTreeWidgetItem, QPushButton, QHBoxLayout, QWidget, QLabel
 from PySide6.QtWidgets import QAbstractItemView
 from PySide6.QtCore import Signal, Qt
 from PySide6.QtGui import QFont, QColor
@@ -11,39 +11,118 @@ class SymbolTreeView(QTreeWidget):
     # Allow callers to disable hover-show behaviour (some hosts prefer no hover)
     show_hover_favorite = True
 
+    def apply_theme(self):
+        """Apply theme-aware styles to this tree view."""
+        try:
+            from Theme.theme_manager import ThemeManager
+            t = ThemeManager.instance().tokens()
+            bg     = t.get("bg_panel",      "#ffffff")
+            sel    = t.get("bg_selected",   "#1565c0")
+            sel_t  = t.get("text_selected", "#ffffff")
+            hov    = t.get("bg_row_hover",  "#e3f2fd")
+            txt    = t.get("text_primary",  "#1a202c")
+            alt    = t.get("bg_row_alt",    "#f9fafb")
+        except Exception:
+            bg="#ffffff"; sel="#e6f2ff"; sel_t="#1a202c"; hov="#f7f7f7"; txt="#1a202c"; alt="#f9fafb"
+
+        self.setStyleSheet(f"""
+            QTreeWidget {{
+                background: {bg};
+                color: {txt};
+                border: none;
+                outline: none;
+            }}
+            QTreeWidget::item {{
+                min-height: 34px;
+                color: {txt};
+            }}
+            QTreeWidget::item:selected {{
+                background: {sel};
+                color: {sel_t};
+            }}
+            QTreeWidget::item:hover {{
+                background: {hov};
+            }}
+            QTreeWidget::item:alternate {{
+                background: {alt};
+            }}
+        """)
+
+        # Re-colour existing category header rows and update name labels
+        def _restyle(item):
+            from PySide6.QtGui import QColor as _QC
+            from PySide6.QtCore import Qt as _Qt
+            data = item.data(0, _Qt.UserRole)
+            if data and data.get("type") == "category":
+                try:
+                    from Theme.theme_manager import ThemeManager as _TM
+                    _t2 = _TM.instance().tokens()
+                    item.setBackground(0, _QC(_t2.get("bg_header", "#f0f4f8")))
+                    item.setForeground(0, _QC(_t2.get("text_secondary", "#4a5568")))
+                except Exception:
+                    pass
+            elif data and data.get("type") == "symbol":
+                # Update the name label color inside the custom widget
+                try:
+                    from PySide6.QtWidgets import QTreeWidget as _TW
+                    w = self.itemWidget(item, 0)
+                    if w and hasattr(w, "name_label"):
+                        w.name_label.setStyleSheet(
+                            f"background: transparent; color: {txt}; "
+                            "font-size: 11px; border: none;"
+                        )
+                except Exception:
+                    pass
+            for i in range(item.childCount()):
+                _restyle(item.child(i))
+
+        try:
+            for i in range(self.topLevelItemCount()):
+                _restyle(self.topLevelItem(i))
+        except Exception:
+            pass
+
     def update_symbols(self, symbols):
         """Update only the tree items for the given symbols (set of symbol names)"""
         if not symbols:
             return
-        def update_item_recursive(item):
-            item_data = item.data(0, Qt.UserRole)
-            if item_data and item_data.get('type') == 'symbol':
-                symbol_name = item_data.get('name')
-                if symbol_name in symbols:
-                    # Optionally update favorite status or other visuals
-                    is_favorite = self.symbol_manager.is_favorite(symbol_name) if self.symbol_manager else False
-                    item_data['is_favorite'] = is_favorite
-                    # Update star button if present
-                    star_btn = item.data(1, Qt.UserRole)
-                    if star_btn:
-                        star_btn.setText("★" if is_favorite else "☆")
-                        star_btn.setStyleSheet(f"""
-                            QPushButton {{
-                                background: transparent;
-                                border: none;
-                                color: {'#ffa500' if is_favorite else '#ccc'};
-                                font-size: 16px;
-                                padding: 0px;
-                            }}
-                            QPushButton:hover {{
-                                color: #ffa500;
-                            }}
-                        """)
-            for i in range(item.childCount()):
-                update_item_recursive(item.child(i))
-        # Traverse all top-level items
-        for i in range(self.topLevelItemCount()):
-            update_item_recursive(self.topLevelItem(i))
+        
+        try:
+            def update_item_recursive(item):
+                item_data = item.data(0, Qt.UserRole)
+                if item_data and item_data.get('type') == 'symbol':
+                    symbol_name = item_data.get('name')
+                    if symbol_name in symbols:
+                        # Optionally update favorite status or other visuals
+                        is_favorite = self.symbol_manager.is_favorite(symbol_name) if self.symbol_manager else False
+                        item_data['is_favorite'] = is_favorite
+                        # Update star button if present
+                        star_btn = item.data(1, Qt.UserRole)
+                        if star_btn:
+                            star_btn.setText("★" if is_favorite else "☆")
+                            star_btn.setStyleSheet(f"""
+                                QPushButton {{
+                                    background: transparent;
+                                    border: none;
+                                    color: {'#ffa500' if is_favorite else '#ccc'};
+                                    font-size: 16px;
+                                    padding: 0px;
+                                }}
+                                QPushButton:hover {{
+                                    color: #ffa500;
+                                }}
+                            """)
+                for i in range(item.childCount()):
+                    update_item_recursive(item.child(i))
+            
+            # Traverse all top-level items
+            for i in range(self.topLevelItemCount()):
+                item = self.topLevelItem(i)
+                if item:  # Safety check in case item was deleted
+                    update_item_recursive(item)
+        except RuntimeError:
+            # Tree or items were deleted while updating, ignore
+            pass
     
     def __init__(self, symbol_manager, account_id=None, active_account_id=None, parent=None):
         super().__init__(parent)
@@ -75,12 +154,16 @@ class SymbolTreeView(QTreeWidget):
         self.setColumnCount(1)
         # Light hover background, avoid dark system-blue on hover
         # Increase minimum item height slightly for readability
-        self.setStyleSheet(
-            "QTreeWidget { background: #fff; border: none; }"
-            "QTreeWidget::item { min-height: 34px; }"
-            "QTreeWidget::item:selected { background: #e6f2ff; }"
-            "QTreeWidget::item:hover { background: #f7f7f7; }"
-        )
+        self.apply_theme()
+
+        # Subscribe to theme changes
+        try:
+            from Theme.theme_manager import ThemeManager
+            ThemeManager.instance().theme_changed.connect(
+                lambda name, tokens: self.apply_theme()
+            )
+        except Exception:
+            pass
 
         # Track hovered item for showing star button
         self.hovered_item = None
@@ -114,7 +197,15 @@ class SymbolTreeView(QTreeWidget):
             font.setBold(True)
             font.setPointSize(11)
             category_item.setFont(0, font)
-            category_item.setBackground(0, QColor("#f0f0f0"))
+            try:
+                from Theme.theme_manager import ThemeManager
+                _t = ThemeManager.instance().tokens()
+                _cat_bg = _t.get("bg_header", "#f0f0f0")
+                _cat_fg = _t.get("text_secondary", "#4a5568")
+            except Exception:
+                _cat_bg = "#f0f0f0"; _cat_fg = "#4a5568"
+            category_item.setBackground(0, QColor(_cat_bg))
+            category_item.setForeground(0, QColor(_cat_fg))
             
             # Set collapsed by default
             category_item.setExpanded(False)
@@ -128,15 +219,29 @@ class SymbolTreeView(QTreeWidget):
                 
                 symbol_item = QTreeWidgetItem(category_item)
                 
-                # Create custom widget with symbol name and star button
+                # Create custom widget with symbol name label and star button
                 widget = QWidget()
+                widget.setAttribute(Qt.WA_TransparentForMouseEvents, False)
                 layout = QHBoxLayout(widget)
-                layout.setContentsMargins(5, 0, 5, 0)
-                layout.setSpacing(5)
-                
-                # Symbol name label (as text in tree item)
-                symbol_item.setText(0, f"  {symbol_name}")
-                
+                layout.setContentsMargins(6, 0, 5, 0)
+                layout.setSpacing(4)
+
+                # Symbol name label — always visible
+                try:
+                    from Theme.theme_manager import ThemeManager as _TM
+                    _tok = _TM.instance().tokens()
+                    _sym_color = _tok.get("text_primary", "#1a202c")
+                except Exception:
+                    _sym_color = "#1a202c"
+
+                name_label = QLabel(symbol_name)
+                name_label.setStyleSheet(
+                    f"background: transparent; color: {_sym_color}; "
+                    "font-size: 11px; border: none;"
+                )
+                # Store label so apply_theme can recolor it
+                widget.name_label = name_label
+
                 # Store symbol data
                 is_favorite = self.symbol_manager.is_favorite(symbol_name) if self.symbol_manager else False
                 symbol_item.setData(0, Qt.UserRole, {
@@ -144,31 +249,28 @@ class SymbolTreeView(QTreeWidget):
                     'name': symbol_name,
                     'is_favorite': is_favorite
                 })
-                
-                # Create star button (initially hidden)
+
+                # Create star button (initially hidden, shown on hover)
                 star_btn = QPushButton("★" if is_favorite else "☆")
                 star_btn.setFixedSize(20, 20)
-                star_btn.setStyleSheet(f"""
-                    QPushButton {{
-                        background: transparent;
-                        border: none;
-                        color: {'#ffa500' if is_favorite else '#ccc'};
-                        font-size: 16px;
-                        padding: 0px;
-                    }}
-                    QPushButton:hover {{
-                        color: #ffa500;
-                    }}
-                """)
-                star_btn.clicked.connect(lambda checked, name=symbol_name, item=symbol_item: self.toggle_favorite(name, item))
+                star_btn.setStyleSheet(
+                    f"QPushButton {{ background: transparent; border: none; "
+                    f"color: {'#ffa500' if is_favorite else '#ccc'}; "
+                    f"font-size: 14px; padding: 0px; }}"
+                    f"QPushButton:hover {{ color: #ffa500; }}"
+                )
+                star_btn.clicked.connect(
+                    lambda checked, name=symbol_name, item=symbol_item: self.toggle_favorite(name, item)
+                )
                 star_btn.hide()  # Initially hidden
-                
+
                 # Store star button reference in item
                 symbol_item.setData(1, Qt.UserRole, star_btn)
-                
+
+                layout.addWidget(name_label)
                 layout.addStretch()
                 layout.addWidget(star_btn)
-                
+
                 self.setItemWidget(symbol_item, 0, widget)
     
     def _categorize_symbols(self, symbols):

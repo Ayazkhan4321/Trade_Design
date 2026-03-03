@@ -20,6 +20,13 @@ from MarketWatch_jetfyx.core.symbol_manager import SymbolManager
 from MarketWatch_jetfyx.services.market_data_service import MarketDataService
 from accounts.store import AppStore
 
+try:
+    from Theme.theme_manager import ThemeManager as _ThemeManager
+    _THEME_AVAILABLE = True
+except ImportError:
+    _ThemeManager = None
+    _THEME_AVAILABLE = False
+
 
 class MarketWidget(QWidget):
     """Main market widget with tabbed interface for Favourites and All Symbols"""
@@ -84,9 +91,6 @@ class MarketWidget(QWidget):
             }
         )
 
-        # Price updates: connect only once an account is set to avoid
-        # receiving market updates before login/selection.
-
         # Subscribe to store account changes so MarketWidget reacts
         try:
             store = AppStore.instance()
@@ -121,8 +125,16 @@ class MarketWidget(QWidget):
         if self.account_id:
             self._fetch_and_load_symbols(self.account_id)
 
+        # Connect theme manager
+        if _THEME_AVAILABLE:
+            try:
+                _ThemeManager.instance().theme_changed.connect(
+                    lambda name, t: self.apply_theme()
+                )
+            except Exception:
+                pass
+
         if self.market_data_service:
-            # Ensure incoming updates are marshalled to the GUI thread
             try:
                 self.marketUpdate.connect(self._on_market_update)
             except Exception:
@@ -151,27 +163,38 @@ class MarketWidget(QWidget):
                 self._load_all_symbols()
         else:
             if self.current_tab == 0:
-                self.favorites_table.update_symbols({symbol})
+                if self.favorites_table and hasattr(self.favorites_table, 'update_symbols'):
+                    try:
+                        self.favorites_table.update_symbols({symbol})
+                    except RuntimeError:
+                        pass
             else:
-                self.all_symbols_tree.update_symbols({symbol})
+                if self.all_symbols_tree and hasattr(self.all_symbols_tree, 'update_symbols'):
+                    try:
+                        self.all_symbols_tree.update_symbols({symbol})
+                    except RuntimeError:
+                        pass
 
     def _on_price_updated(self, symbol, sell, buy):
         if self.current_tab == 0:
-            self.favorites_table.update_symbols({symbol})
+            if self.favorites_table and hasattr(self.favorites_table, 'update_symbols'):
+                try:
+                    self.favorites_table.update_symbols({symbol})
+                except RuntimeError:
+                    pass
         else:
-            self.all_symbols_tree.update_symbols({symbol})
+            if self.all_symbols_tree and hasattr(self.all_symbols_tree, 'update_symbols'):
+                try:
+                    self.all_symbols_tree.update_symbols({symbol})
+                except RuntimeError:
+                    pass
 
     def on_account_changed(self, account: dict):
-        """Called when the application's active account changes.
-
-        This forwards the account id to `set_account_id` to (re)start
-        market data for the newly active account.
-        """
+        """Called when the application's active account changes."""
         print(f"[MarketWidget] on_account_changed called with: {account}")
         if not account:
             return
 
-        # Try several possible keys for account id
         account_id = account.get("account_id") or account.get("accountId") or account.get("id")
         if not account_id:
             return
@@ -191,7 +214,6 @@ class MarketWidget(QWidget):
         import logging
         logger = logging.getLogger(__name__)
 
-        # Use centralized auth_service from `accounts` package
         from accounts.auth_service import get_token
         from MarketWatch_jetfyx.api.config import API_FAVOURITE_WATCHLIST_TEMPLATE, API_VERIFY_TLS, API_TIMEOUT
 
@@ -244,23 +266,9 @@ class MarketWidget(QWidget):
         layout.setSpacing(6)
         layout.setContentsMargins(8, 8, 8, 8)
 
-        # Title label removed per user request (tab header already shows "Market View")
-
         self.search = QLineEdit()
         self.search.setPlaceholderText("Search Symbols...")
-        self.search.setStyleSheet(
-            """
-            QLineEdit {
-                padding: 8px;
-                border: 1px solid #ddd;
-                border-radius: 4px;
-                font-size: 13px;
-            }
-            QLineEdit:focus {
-                border: 2px solid #1976d2;
-            }
-            """
-        )
+        self.search.setObjectName("MarketSearch")
 
         self.tab_bar = TabBar()
         self._update_tab_counts()
@@ -276,17 +284,8 @@ class MarketWidget(QWidget):
             self.app_settings,
             self.order_service,
         )
-        # Disable hover star in the favorites table (user requested)
         try:
             self.favorites_table.show_hover_favorite = False
-        except Exception:
-            pass
-        # Disable hover background (only for favorites table)
-        try:
-            self.favorites_table.setStyleSheet(
-                (self.favorites_table.styleSheet() or "")
-                + "\nQTableView::item:hover { background: transparent; }"
-            )
         except Exception:
             pass
         self.favorites_table.set_advance_view(
@@ -308,34 +307,29 @@ class MarketWidget(QWidget):
         self.stacked_widget.addWidget(self.favorites_table)
         self.stacked_widget.addWidget(self.all_symbols_tree)
 
-        # title removed
         layout.addWidget(self.search)
         layout.addWidget(self.tab_bar)
         layout.addWidget(self.stacked_widget)
 
-    def set_account_id(self, account_id):
-        """Set or change the active account for market data.
+        # Apply initial theme styles
+        self.apply_theme()
 
-        This will (re)connect the MarketDataService for the given account
-        and fetch the favourite/watchlist symbols for it.
-        """
+    def set_account_id(self, account_id):
+        """Set or change the active account for market data."""
         if not account_id:
             return
 
-        # If already set to this account, nothing to do
         if self.account_id == account_id and self.market_data_service:
             return
 
         self.account_id = account_id
 
-        # Disconnect existing market data service if present
         if self.market_data_service:
             try:
                 self.market_data_service.disconnect()
             except Exception:
                 pass
 
-        # Create and connect a new market data service for this account
         from MarketWatch_jetfyx.services.market_data_service import MarketDataService
         self.market_data_service = MarketDataService(
             account_id=self.account_id,
@@ -346,7 +340,6 @@ class MarketWidget(QWidget):
         except Exception:
             pass
 
-        # Fetch symbols for the new account
         try:
             self._fetch_and_load_symbols(self.account_id)
         except Exception:
@@ -355,9 +348,7 @@ class MarketWidget(QWidget):
         if self.market_data_service:
             self.market_data_service.set_on_update_callback(self._on_market_update)
 
-        # Connect price update signal now that an account is active
         try:
-            # Only disconnect if we previously connected — avoids PySide warnings
             if getattr(self, '_price_connected', False):
                 try:
                     self.price_service.priceUpdated.disconnect(self._on_price_updated)
@@ -365,18 +356,107 @@ class MarketWidget(QWidget):
                     pass
                 self._price_connected = False
 
-            # Connect once and remember that we did
             try:
                 self.price_service.priceUpdated.connect(self._on_price_updated)
                 self._price_connected = True
             except Exception:
-                # Price service may not expose the signal in some tests/environments
                 self._price_connected = False
         except Exception:
             pass
 
     # -------------------------
-    # Signals
+    # Theme
+    # -------------------------
+    def _get_tokens(self) -> dict:
+        """Return current theme tokens, or empty dict if theme unavailable."""
+        if _THEME_AVAILABLE:
+            try:
+                return _ThemeManager.instance().tokens()
+            except Exception:
+                pass
+        return {}
+
+    def apply_theme(self):
+        """Re-style all child widgets using current theme tokens."""
+        t = self._get_tokens()
+
+        bg_input   = t.get("bg_input",       "#f5f7fa")
+        text_p     = t.get("text_primary",   "#1a202c")
+        border_p   = t.get("border_primary", "#e5e7eb")
+        border_foc = t.get("border_focus",   "#1976d2")
+        bg_panel   = t.get("bg_panel",       "#ffffff")
+        bg_sel     = t.get("bg_selected",    "#1565c0")
+        text_sel   = t.get("text_selected",  "#ffffff")
+        text_hdr   = t.get("text_secondary", "#4a5568")
+        border_gr  = t.get("border_separator","#e5e7eb")
+        bg_hover   = t.get("bg_row_hover",   "#e3f2fd")
+        bg_alt     = t.get("bg_row_alt",     "#f9fafb")
+        bg_widget  = t.get("bg_widget",      "#ffffff")
+
+        # ── Search field ──────────────────────────────────────────────
+        if hasattr(self, "search"):
+            self.search.setStyleSheet(f"""
+                QLineEdit {{
+                    padding: 8px;
+                    background: {bg_input};
+                    color: {text_p};
+                    border: 1px solid {border_p};
+                    border-radius: 4px;
+                    font-size: 13px;
+                }}
+                QLineEdit:focus {{
+                    border: 2px solid {border_foc};
+                }}
+            """)
+
+        # ── Favourites table ─────────────────────────────────────────
+        if hasattr(self, "favorites_table") and self.favorites_table:
+            self.favorites_table.setStyleSheet(f"""
+                QTableView {{
+                    background: {bg_panel};
+                    alternate-background-color: {bg_alt};
+                    color: {text_p};
+                    border: none;
+                    gridline-color: {border_gr};
+                }}
+                QTableView::item:selected {{
+                    background: {bg_sel};
+                    color: {text_sel};
+                }}
+                QTableView::item:hover {{
+                    background: {bg_hover};
+                }}
+                QHeaderView::section {{
+                    background: {bg_panel};
+                    color: {text_hdr};
+                    border: none;
+                    border-bottom: 1px solid {border_p};
+                    font-size: 11px;
+                    font-weight: 600;
+                    padding: 4px 8px;
+                }}
+            """)
+            try:
+                self.favorites_table.viewport().update()
+            except Exception:
+                pass
+
+        # ── All symbols tree ─────────────────────────────────────────
+        if hasattr(self, "all_symbols_tree") and self.all_symbols_tree:
+            if hasattr(self.all_symbols_tree, "apply_theme"):
+                try:
+                    self.all_symbols_tree.apply_theme()
+                except Exception:
+                    pass
+
+        # ── Tab bar ───────────────────────────────────────────────────
+        if hasattr(self, "tab_bar") and self.tab_bar:
+            if hasattr(self.tab_bar, "apply_theme"):
+                try:
+                    self.tab_bar.apply_theme()
+                except Exception:
+                    pass
+
     # -------------------------
     def _connect_signals(self):
         self.search.textChanged.connect(self._on_search_changed)
@@ -386,7 +466,6 @@ class MarketWidget(QWidget):
             self._on_favorites_changed
         )
 
-        # Search dropdown signals
         self.search_dropdown.symbolSelected.connect(self._on_search_symbol_selected)
         self.search_dropdown.favoriteToggled.connect(self._on_favorite_toggled)
 
@@ -424,7 +503,6 @@ class MarketWidget(QWidget):
     # Search
     # -------------------------
     def _on_search_changed(self, text):
-        # Show search dropdown with local results; do not mutate tables
         if not text.strip():
             self.search_dropdown.hide()
             return
@@ -432,7 +510,6 @@ class MarketWidget(QWidget):
         results = self.symbol_manager.search_symbols(text)
         self._position_search_dropdown()
         self.search_dropdown.show_results(results)
-        # Ensure the search `QLineEdit` keeps focus so typing continues
         try:
             if not self.search.hasFocus():
                 self.search.setFocus(Qt.OtherFocusReason)
@@ -440,7 +517,6 @@ class MarketWidget(QWidget):
             pass
 
     def _on_search_symbol_selected(self, symbol):
-        # User selected a symbol from dropdown
         self.search.setText(symbol)
         self.search.setFocus()
         self.search_dropdown.hide()
@@ -483,7 +559,6 @@ class MarketWidget(QWidget):
         self.favorites_table.set_symbols(
             self.symbol_manager.get_favorites()
         )
-        # Refresh search dropdown visuals if visible
         try:
             if hasattr(self, 'search_dropdown') and self.search_dropdown.isVisible():
                 current = self.search.text()
@@ -499,6 +574,9 @@ class MarketWidget(QWidget):
     def _on_settings_clicked(self):
         dialog = SettingsDialog(self)
         dialog.set_settings(self.app_settings)
+
+        # SettingsDialog subscribes to ThemeManager.theme_changed internally
+        # and applies all tokens itself — no external stylesheet injection needed.
 
         if self.settings_service:
             dialog.settingsChanged.connect(
@@ -524,7 +602,6 @@ class MarketWidget(QWidget):
         self.tab_bar.update_counts(fav_count, all_count)
 
     def mousePressEvent(self, event):
-        # Hide search dropdown when clicking outside search or dropdown
         try:
             if hasattr(self, 'search_dropdown') and self.search_dropdown.isVisible():
                 gp = event.globalPos()

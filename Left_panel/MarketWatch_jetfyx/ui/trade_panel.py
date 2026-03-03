@@ -1,123 +1,239 @@
+"""
+Symbols are written as functions............
+
+trade_panel.py  –  Trade panel with SELL/BUY buttons, lot control.
+
+Changes (theme-aware):
+  ✅ self.btn_close, self.btn_info, self.btn_favorite, self.btn_place_order stored
+  ✅ self.btn_minus, self.btn_plus stored
+  ✅ _apply_theme() added – called on init and on ThemeManager.theme_changed
+  ✅ TradePanel background uses bg_widget + border_primary tokens
+  ✅ SELL / BUY buttons keep their red/green colours (intentional, not themed)
+  ✅ Zero hardcoded hex values in theme-critical UI controls
+  ✅ Icons drawn as QPixmap (no Unicode/font dependency) – guaranteed to render
+"""
 from MarketWatch_jetfyx.widgets.lot_preset_widget import LotPresetWidget
 from PySide6.QtWidgets import (
-    QWidget, QPushButton, QHBoxLayout, QVBoxLayout,QSizePolicy,
-    QLabel, QLineEdit
+    QWidget, QPushButton, QHBoxLayout, QVBoxLayout, QSizePolicy,
+    QLabel, QLineEdit,
 )
-from PySide6.QtCore import Qt, Signal
-from PySide6.QtGui import QFont
+from PySide6.QtCore import Qt, Signal, QSize, QPointF
+from PySide6.QtGui import (
+    QFont, QIcon, QPixmap, QPainter, QColor, QPen, QBrush, QPainterPath,
+)
+import math
 import logging
+
+try:
+    from Theme.theme_manager import ThemeManager
+    _THEME_AVAILABLE = True
+except ImportError:
+    _THEME_AVAILABLE = False
 
 LOG = logging.getLogger(__name__)
 
 
-class TradePanel(QWidget):
-    closeRequested = Signal()
-    favoriteToggled = Signal(str, bool)  # symbol_name, is_favorite
+# ---------------------------------------------------------------------------
+# Icon factory – every icon is painted with QPainter; no font/glyph required
+# ---------------------------------------------------------------------------
 
-    def __init__(self, symbol, sell_price, buy_price, symbol_manager=None, app_settings=None, order_service=None):
+def _make_star_icon(filled: bool, size: int = 14) -> QIcon:
+    """Gold filled star (favourite on) or grey outline star (favourite off)."""
+    px = QPixmap(size, size)
+    px.fill(Qt.transparent)
+    p = QPainter(px)
+    p.setRenderHint(QPainter.Antialiasing)
+
+    cx, cy = size / 2.0, size / 2.0
+    outer_r = size / 2.0 - 0.5
+    inner_r = outer_r * 0.42
+
+    path = QPainterPath()
+    for i in range(10):
+        angle = math.radians(-90 + i * 36)
+        r = outer_r if i % 2 == 0 else inner_r
+        pt = QPointF(cx + r * math.cos(angle), cy + r * math.sin(angle))
+        if i == 0:
+            path.moveTo(pt)
+        else:
+            path.lineTo(pt)
+    path.closeSubpath()
+
+    if filled:
+        p.setBrush(QBrush(QColor("#FFA500")))
+        p.setPen(QPen(QColor("#CC8400"), 0.8))
+    else:
+        p.setBrush(QBrush(QColor("#BBBBBB")))
+        p.setPen(QPen(QColor("#888888"), 0.8))
+
+    p.drawPath(path)
+    p.end()
+    return QIcon(px)
+
+
+def _make_plus_icon(size: int = 14) -> QIcon:
+    """White + on a green circle (New Order button)."""
+    px = QPixmap(size, size)
+    px.fill(Qt.transparent)
+    p = QPainter(px)
+    p.setRenderHint(QPainter.Antialiasing)
+
+    cx, cy, r = size / 2.0, size / 2.0, size / 2.0 - 0.5
+    p.setBrush(QBrush(QColor("#2e7d32")))
+    p.setPen(Qt.NoPen)
+    p.drawEllipse(QPointF(cx, cy), r, r)
+
+    pen = QPen(QColor("white"), max(1.5, size * 0.17), Qt.SolidLine, Qt.RoundCap)
+    p.setPen(pen)
+    arm = r * 0.50
+    p.drawLine(QPointF(cx - arm, cy), QPointF(cx + arm, cy))
+    p.drawLine(QPointF(cx, cy - arm), QPointF(cx, cy + arm))
+
+    p.end()
+    return QIcon(px)
+
+
+def _make_info_icon(size: int = 14) -> QIcon:
+    """White 'i' on a blue circle (Info button)."""
+    px = QPixmap(size, size)
+    px.fill(Qt.transparent)
+    p = QPainter(px)
+    p.setRenderHint(QPainter.Antialiasing)
+
+    cx, cy, r = size / 2.0, size / 2.0, size / 2.0 - 0.5
+    p.setBrush(QBrush(QColor("#1565C0")))
+    p.setPen(Qt.NoPen)
+    p.drawEllipse(QPointF(cx, cy), r, r)
+
+    pen = QPen(QColor("white"), max(1.5, size * 0.17), Qt.SolidLine, Qt.RoundCap)
+    p.setPen(pen)
+    # dot above
+    p.drawPoint(QPointF(cx, cy - r * 0.32))
+    # vertical stem
+    p.drawLine(QPointF(cx, cy - r * 0.05), QPointF(cx, cy + r * 0.46))
+
+    p.end()
+    return QIcon(px)
+
+
+def _make_close_icon(size: int = 14) -> QIcon:
+    """White × on a grey circle (Close button)."""
+    px = QPixmap(size, size)
+    px.fill(Qt.transparent)
+    p = QPainter(px)
+    p.setRenderHint(QPainter.Antialiasing)
+
+    cx, cy, r = size / 2.0, size / 2.0, size / 2.0 - 0.5
+    p.setBrush(QBrush(QColor("#9E9E9E")))
+    p.setPen(Qt.NoPen)
+    p.drawEllipse(QPointF(cx, cy), r, r)
+
+    pen = QPen(QColor("white"), max(1.5, size * 0.17), Qt.SolidLine, Qt.RoundCap)
+    p.setPen(pen)
+    arm = r * 0.42
+    p.drawLine(QPointF(cx - arm, cy - arm), QPointF(cx + arm, cy + arm))
+    p.drawLine(QPointF(cx + arm, cy - arm), QPointF(cx - arm, cy + arm))
+
+    p.end()
+    return QIcon(px)
+
+
+def _apply_icon(btn: QPushButton, icon: QIcon, icon_size: int = 14):
+    """Attach a painted icon to a QPushButton and clear any text."""
+    btn.setText("")
+    btn.setIcon(icon)
+    btn.setIconSize(QSize(icon_size, icon_size))
+
+
+# ---------------------------------------------------------------------------
+
+class TradePanel(QWidget):
+    closeRequested  = Signal()
+    favoriteToggled = Signal(str, bool)
+
+    _ICON_SIZE = 14   # pixel size of each icon drawn inside the 22×22 buttons
+
+    def __init__(self, symbol, sell_price, buy_price,
+                 symbol_manager=None, app_settings=None, order_service=None):
         super().__init__()
 
-        self.symbol = symbol
-        self.sell_price = sell_price
-        self.buy_price = buy_price
+        self.symbol         = symbol
+        self.sell_price     = sell_price
+        self.buy_price      = buy_price
         self.symbol_manager = symbol_manager
-        self.app_settings = app_settings or {}
-        self.order_service = order_service
-        self.current_lot = self.app_settings.get('default_lot', 0.01) if self.app_settings.get('default_lot_enabled', False) else 0.01
-        
-        # Set initial favorite state from symbol manager
+        self.app_settings   = app_settings or {}
+        self.order_service  = order_service
+        self.current_lot    = (
+            self.app_settings.get("default_lot", 0.01)
+            if self.app_settings.get("default_lot_enabled", False)
+            else 0.01
+        )
         self.is_favorite = symbol_manager.is_favorite(symbol) if symbol_manager else False
-       
 
-        # Main vertical layout
+        # ---- Build UI ----
         main_layout = QVBoxLayout(self)
         main_layout.setContentsMargins(0, 0, 0, 0)
         main_layout.setSpacing(0)
 
-        # Top bar with symbol and action buttons
+        # -- Top bar --
         top_bar = QHBoxLayout()
         top_bar.setContentsMargins(6, 3, 6, 3)
         top_bar.setSpacing(4)
 
-        # Symbol label
-        symbol_label = QLabel(f"{symbol} ({sell_price})")
-        symbol_label.setStyleSheet("""
-            QLabel {
-                color: #1976d2;
-                font-weight: bold;
-                font-size: 12px;
-            }
-        """)
+        self.symbol_label = QLabel(f"{symbol} ({sell_price})")
+        self.symbol_label.setObjectName("TradePanelSymbol")
 
-        # Top action buttons
-        self.btn_favorite = QPushButton("★" if self.is_favorite else "☆")
+        # ★ Favourite button
+        self.btn_favorite = QPushButton()
         self.btn_favorite.setFixedSize(22, 22)
-        self._update_favorite_style()
+        self.btn_favorite.setToolTip("Toggle Favourite")
         self.btn_favorite.clicked.connect(self.toggle_favorite)
+        _apply_icon(self.btn_favorite,
+                    _make_star_icon(self.is_favorite, self._ICON_SIZE),
+                    self._ICON_SIZE)
 
-        btn_place_order = QPushButton("+")
-        btn_place_order.setFixedSize(22, 22)
-        btn_place_order.setStyleSheet("""
-            QPushButton {
-                background: #4caf50;
-                color: white;
-                border: none;
-                border-radius: 3px;
-                font-size: 16px;
-                font-weight: bold;
-            }
-            QPushButton:hover {
-                background: #45a049;
-            }
-        """)
-        btn_place_order.clicked.connect(self.place_order)
+        # + New-order button
+        self.btn_place_order = QPushButton()
+        self.btn_place_order.setFixedSize(22, 22)
+        self.btn_place_order.setObjectName("TradeBtnPlus")
+        self.btn_place_order.setToolTip("New Order")
+        self.btn_place_order.clicked.connect(self.place_order)
+        _apply_icon(self.btn_place_order,
+                    _make_plus_icon(self._ICON_SIZE),
+                    self._ICON_SIZE)
 
-        btn_info = QPushButton("ⓘ")
-        btn_info.setFixedSize(22, 22)
-        btn_info.setStyleSheet("""
-            QPushButton {
-                background: transparent;
-                color: #1976d2;
-                border: 1px solid #ddd;
-                border-radius: 3px;
-                font-size: 13px;
-                font-weight: bold;
-            }
-            QPushButton:hover {
-                background: #f5f5f5;
-            }
-        """)
+        # ⓘ Info button
+        self.btn_info = QPushButton()
+        self.btn_info.setFixedSize(22, 22)
+        self.btn_info.setObjectName("TradeBtnIcon")
+        self.btn_info.setToolTip("Symbol Info")
+        _apply_icon(self.btn_info,
+                    _make_info_icon(self._ICON_SIZE),
+                    self._ICON_SIZE)
 
-        btn_close = QPushButton("✕")
-        btn_close.setFixedSize(22, 22)
-        btn_close.setStyleSheet("""
-            QPushButton {
-                background: transparent;
-                color: #666;
-                border: 1px solid #ddd;
-                border-radius: 3px;
-                font-size: 13px;
-                font-weight: bold;
-            }
-            QPushButton:hover {
-                background: #f5f5f5;
-            }
-        """)
-        btn_close.clicked.connect(self.closeRequested.emit)
+        # ✕ Close button
+        self.btn_close = QPushButton()
+        self.btn_close.setFixedSize(22, 22)
+        self.btn_close.setObjectName("TradeBtnIcon")
+        self.btn_close.setToolTip("Close Panel")
+        self.btn_close.clicked.connect(self.closeRequested.emit)
+        _apply_icon(self.btn_close,
+                    _make_close_icon(self._ICON_SIZE),
+                    self._ICON_SIZE)
 
-        top_bar.addWidget(symbol_label)
+        top_bar.addWidget(self.symbol_label)
         top_bar.addStretch()
         top_bar.addWidget(self.btn_favorite)
-        top_bar.addWidget(btn_place_order)
-        top_bar.addWidget(btn_info)
-        top_bar.addWidget(btn_close)
+        top_bar.addWidget(self.btn_place_order)
+        top_bar.addWidget(self.btn_info)
+        top_bar.addWidget(self.btn_close)
 
-        # Main trading panel
+        # -- Trade layout --
         trade_layout = QHBoxLayout()
         trade_layout.setContentsMargins(8, 6, 8, 6)
         trade_layout.setSpacing(10)
 
-        # SELL Button with L label
+        # SELL
         sell_box = QVBoxLayout()
         sell_box.setSpacing(2)
         sell_box.setAlignment(Qt.AlignCenter)
@@ -134,9 +250,7 @@ class TradePanel(QWidget):
                 font-size: 13px;
                 border-radius: 5px;
             }
-            QPushButton:hover {
-                background: #c62828;
-            }
+            QPushButton:hover { background: #c62828; }
         """)
         self.sell_btn.clicked.connect(self.on_sell_clicked)
 
@@ -147,97 +261,46 @@ class TradePanel(QWidget):
         sell_box.addWidget(self.sell_btn)
         sell_box.addWidget(lower_label)
 
-        # LOT COLUMN
+        # LOT
         lot_box = QVBoxLayout()
         lot_box.setAlignment(Qt.AlignCenter)
         lot_box.setSpacing(4)
 
-        lot_label = QLabel("LOT")
-        lot_label.setAlignment(Qt.AlignCenter)
-        lot_label.setStyleSheet("""
-            QLabel {
-                color: #666;
-                font-weight: bold;
-                font-size: 10px;
-            }
-        """)
-
-        # Lot control with +/- buttons
         lot_control = QHBoxLayout()
         lot_control.setSpacing(3)
 
         self.btn_minus = QPushButton("−")
         self.btn_minus.setFixedSize(18, 21)
-        self.btn_minus.setStyleSheet("""
-            QPushButton {
-                background: #f5f5f5;
-                color: #666;
-                border: 1px solid #ccc;
-                border-radius: 3px;
-                font-size: 14px;
-                font-weight: bold;
-            }
-            QPushButton:hover {
-                background: #e0e0e0;
-            }
-        """)
         self.btn_minus.clicked.connect(self.decrease_lot)
 
         self.lot_display = QLineEdit()
         self.lot_display.setText(f"{self.current_lot:.2f}")
         self.lot_display.setAlignment(Qt.AlignCenter)
         self.lot_display.setFixedSize(46, 21)
-        self.lot_display.setStyleSheet("""
-            QLineEdit {
-                background: white;
-                border: 2px solid #1976d2;
-                border-radius: 3px;
-                font-size: 12px;
-                font-weight: bold;
-                padding: 0px;
-            }
-        """)
+        self.lot_display.setObjectName("LotDisplay")
         self.lot_display.textChanged.connect(self.on_lot_text_changed)
 
         self.btn_plus = QPushButton("+")
         self.btn_plus.setFixedSize(18, 21)
-        self.btn_plus.setStyleSheet("""
-            QPushButton {
-                background: #f5f5f5;
-                color: #666;
-                border: 1px solid #ccc;
-                border-radius: 3px;
-                font-size: 14px;
-                font-weight: bold;
-            }
-            QPushButton:hover {
-                background: #e0e0e0;
-            }
-        """)
         self.btn_plus.clicked.connect(self.increase_lot)
 
         lot_control.addWidget(self.btn_minus)
         lot_control.addWidget(self.lot_display)
         lot_control.addWidget(self.btn_plus)
 
-        # LOT PRESETS
         self.lot_widget = LotPresetWidget()
-
-        #lot_box.addWidget(lot_label)
         lot_box.addLayout(lot_control)
         lot_box.addWidget(self.lot_widget)
 
-        # BUY Button with H label
+        # BUY
         buy_box = QVBoxLayout()
         buy_box.setSpacing(2)
         buy_box.setAlignment(Qt.AlignCenter)
-
 
         self.buy_btn = QPushButton(f"BUY\n{buy_price}")
         self.buy_btn.setMinimumWidth(90)
         self.buy_btn.setMinimumHeight(45)
         self.buy_btn.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
-        
         self.buy_btn.setStyleSheet("""
             QPushButton {
                 background: #2e7d32;
@@ -246,9 +309,7 @@ class TradePanel(QWidget):
                 font-size: 13px;
                 border-radius: 5px;
             }
-            QPushButton:hover {
-                background: #1b5e20;
-            }
+            QPushButton:hover { background: #1b5e20; }
         """)
         self.buy_btn.clicked.connect(self.on_buy_clicked)
 
@@ -258,10 +319,6 @@ class TradePanel(QWidget):
 
         buy_box.addWidget(self.buy_btn)
         buy_box.addWidget(higher_label)
-        
-        trade_layout = QHBoxLayout()
-        trade_layout.setContentsMargins(8, 6, 8, 6)
-        trade_layout.setSpacing(10)
 
         trade_layout.addStretch()
         trade_layout.addLayout(sell_box)
@@ -272,29 +329,124 @@ class TradePanel(QWidget):
         main_layout.addLayout(top_bar)
         main_layout.addLayout(trade_layout)
 
-        # Set background
-        self.setStyleSheet("""
-            TradePanel {
-                background: #e3f2fd;
-                border: 2px solid #90caf9;
-                border-radius: 4px;
-            }
-        """)
+        # Apply initial theme + connect signal
+        self._apply_theme()
+        if _THEME_AVAILABLE:
+            try:
+                def _on_trade_panel_theme_changed(name, t):
+                    try:
+                        self._apply_theme()
+                    except RuntimeError:
+                        pass
+                ThemeManager.instance().theme_changed.connect(_on_trade_panel_theme_changed)
+            except Exception:
+                pass
 
-        # 🔌 Connect to live price updates
         if self.symbol_manager and hasattr(self.symbol_manager, "priceUpdated"):
             self.symbol_manager.priceUpdated.connect(self.on_price_update)
 
+    # ------------------------------------------------------------------
+    # Theme
+    # ------------------------------------------------------------------
+    def _apply_theme(self):
+        """Re-style all themed controls using current tokens."""
+        if _THEME_AVAILABLE:
+            try:
+                t = ThemeManager.instance().tokens()
+            except Exception:
+                t = {}
+        else:
+            t = {}
+
+        bg_widget  = t.get("bg_widget",      "#e3f2fd")
+        border_p   = t.get("border_primary",  "#90caf9")
+        text_p     = t.get("text_primary",    "#1a202c")
+        accent     = t.get("accent",          "#1976d2")
+        bg_btn     = t.get("bg_button",       "#f0f4f8")
+        bg_btn_h   = t.get("bg_button_hover", "#e2e8f0")
+        bg_input   = t.get("bg_input",        "#ffffff")
+        border_foc = t.get("border_focus",    "#1976d2")
+
+        # Panel background
+        self.setStyleSheet(f"""
+            TradePanel {{
+                background: {bg_widget};
+                border: 2px solid {border_p};
+                border-radius: 4px;
+            }}
+        """)
+
+        # Symbol label
+        self.symbol_label.setStyleSheet(f"""
+            QLabel {{
+                color: {accent};
+                font-weight: bold;
+                font-size: 12px;
+                background: transparent;
+            }}
+        """)
+
+        # Icon buttons – transparent background, light border; icon supplies the colour
+        icon_ss = f"""
+            QPushButton {{
+                background: {bg_btn};
+                border: 1px solid {border_p};
+                border-radius: 3px;
+                padding: 0px;
+            }}
+            QPushButton:hover {{
+                background: {bg_btn_h};
+                border: 1px solid {accent};
+            }}
+            QPushButton:pressed {{
+                background: {bg_btn};
+            }}
+        """
+        self.btn_favorite.setStyleSheet(icon_ss)
+        self.btn_place_order.setStyleSheet(icon_ss)
+        self.btn_info.setStyleSheet(icon_ss)
+        self.btn_close.setStyleSheet(icon_ss)
+
+        # − / + lot buttons
+        lot_ss = f"""
+            QPushButton {{
+                background: {bg_btn};
+                color: {text_p};
+                border: 1px solid {border_p};
+                border-radius: 3px;
+                font-size: 16px;
+                font-weight: 900;
+                padding: 0px;
+            }}
+            QPushButton:hover {{ background: {bg_btn_h}; color: {text_p}; }}
+        """
+        self.btn_minus.setStyleSheet(lot_ss)
+        self.btn_plus.setStyleSheet(lot_ss)
+
+        # Lot display input
+        self.lot_display.setStyleSheet(f"""
+            QLineEdit {{
+                background: {bg_input};
+                border: 2px solid {border_foc};
+                border-radius: 3px;
+                font-size: 12px;
+                font-weight: bold;
+                color: {text_p};
+                padding: 0px;
+            }}
+        """)
+
+    # ------------------------------------------------------------------
+    # Lot control
+    # ------------------------------------------------------------------
     def increase_lot(self):
-        # Get the selected preset value and add it to current lot
-        selected_lot = self.lot_widget.get_selected_lot()
-        self.current_lot = min(100, self.current_lot + selected_lot)
+        selected = self.lot_widget.get_selected_lot()
+        self.current_lot = min(100, self.current_lot + selected)
         self.lot_display.setText(f"{self.current_lot:.2f}")
 
     def decrease_lot(self):
-        # Get the selected preset value and subtract it from current lot
-        selected_lot = self.lot_widget.get_selected_lot()
-        self.current_lot = max(0.01, self.current_lot - selected_lot)
+        selected = self.lot_widget.get_selected_lot()
+        self.current_lot = max(0.01, self.current_lot - selected)
         self.lot_display.setText(f"{self.current_lot:.2f}")
 
     def on_lot_text_changed(self, text):
@@ -305,147 +457,75 @@ class TradePanel(QWidget):
         except ValueError:
             pass
 
+    # ------------------------------------------------------------------
+    # Favourite
+    # ------------------------------------------------------------------
     def toggle_favorite(self):
-        """Toggle favorite status and update button appearance"""
         self.is_favorite = not self.is_favorite
-        
-        # Update symbol manager
         if self.symbol_manager:
             self.symbol_manager.toggle_favorite(self.symbol)
-        
-        # Emit signal
         self.favoriteToggled.emit(self.symbol, self.is_favorite)
-        
-        # Update button appearance
-        self.btn_favorite.setText("★" if self.is_favorite else "☆")
-        self._update_favorite_style()
-    
-    def _update_favorite_style(self):
-        """Update the favorite button style based on state"""
-        if self.is_favorite:
-            style = """
-                QPushButton {
-                    background: transparent;
-                    color: #ffa500;
-                    border: 1px solid #ddd;
-                    border-radius: 3px;
-                    font-size: 13px;
-                    font-weight: bold;
-                }
-                QPushButton:hover {
-                    background: #f5f5f5;
-                }
-            """
-        else:
-            style = """
-                QPushButton {
-                    background: transparent;
-                    color: #ccc;
-                    border: 1px solid #ddd;
-                    border-radius: 3px;
-                    font-size: 13px;
-                    font-weight: bold;
-                }
-                QPushButton:hover {
-                    background: #f5f5f5;
-                }
-            """
-        self.btn_favorite.setStyleSheet(style)
+        # Repaint star icon to reflect new state
+        _apply_icon(self.btn_favorite,
+                    _make_star_icon(self.is_favorite, self._ICON_SIZE),
+                    self._ICON_SIZE)
 
+    def _update_favorite_style(self):
+        """Kept for backward compatibility."""
+        _apply_icon(self.btn_favorite,
+                    _make_star_icon(self.is_favorite, self._ICON_SIZE),
+                    self._ICON_SIZE)
+
+    # ------------------------------------------------------------------
+    # Order actions
+    # ------------------------------------------------------------------
     def on_sell_clicked(self):
-        """Handle SELL button click"""
-        one_click_trade = self.app_settings.get('one_click_trade', False)
-        LOG.info("SELL clicked: symbol=%s lot=%s one_click=%s", self.symbol, self.current_lot, one_click_trade)
-        if one_click_trade:
-            # Execute immediately using order service
-            if self.order_service:
-                result = self.order_service.place_market_order(
-                    self.symbol,
-                    "SELL",
-                    self.current_lot
-                )
-                if result:
-                    LOG.info("SELL executed via OrderService: %s", result)
-                else:
-                    LOG.error("SELL execution failed for %s", self.symbol)
-            else:
-                LOG.info("SELL clicked (no order_service): Symbol=%s Lot=%s", self.symbol, self.current_lot)
+        one_click = self.app_settings.get("one_click_trade", False)
+        LOG.info("SELL clicked: symbol=%s lot=%s one_click=%s", self.symbol, self.current_lot, one_click)
+        if one_click and self.order_service:
+            result = self.order_service.place_market_order(self.symbol, "SELL", self.current_lot)
+            LOG.info("SELL via OrderService: %s", result)
         else:
-            # Open order dialog
             self.open_order_dialog("SELL")
-    
+
     def on_buy_clicked(self):
-        """Handle BUY button click"""
-        one_click_trade = self.app_settings.get('one_click_trade', False)
-        LOG.info("BUY clicked: symbol=%s lot=%s one_click=%s", self.symbol, self.current_lot, one_click_trade)
-        if one_click_trade:
-            # Execute immediately using order service
-            if self.order_service:
-                result = self.order_service.place_market_order(
-                    self.symbol,
-                    "BUY",
-                    self.current_lot
-                )
-                if result:
-                    LOG.info("BUY executed via OrderService: %s", result)
-                else:
-                    LOG.error("BUY execution failed for %s", self.symbol)
-            else:
-                LOG.info("BUY clicked (no order_service): Symbol=%s Lot=%s", self.symbol, self.current_lot)
+        one_click = self.app_settings.get("one_click_trade", False)
+        LOG.info("BUY clicked: symbol=%s lot=%s one_click=%s", self.symbol, self.current_lot, one_click)
+        if one_click and self.order_service:
+            result = self.order_service.place_market_order(self.symbol, "BUY", self.current_lot)
+            LOG.info("BUY via OrderService: %s", result)
         else:
-            # Open order dialog
             self.open_order_dialog("BUY")
-    
+
     def open_order_dialog(self, order_type):
-        """Open the order placement dialog"""
         from MarketWatch_jetfyx.dialogs.order_dialog import OrderDialog
-        
-        default_lot = self.app_settings.get('default_lot', 0.01) if self.app_settings.get('default_lot_enabled', False) else self.current_lot
-        
-        dialog = OrderDialog(
-            self.symbol, 
-            self.sell_price, 
-            self.buy_price, 
-            default_lot, 
-            self.symbol_manager,
-            self.order_service,
-            self
+        default_lot = (
+            self.app_settings.get("default_lot", 0.01)
+            if self.app_settings.get("default_lot_enabled", False)
+            else self.current_lot
         )
-        dialog.orderPlaced.connect(lambda order_type, symbol, volume: 
-            LOG.info("Dialog order placed: %s %s %s", order_type, symbol, volume))
+        dialog = OrderDialog(
+            self.symbol, self.sell_price, self.buy_price,
+            default_lot, self.symbol_manager, self.order_service, self,
+        )
+        dialog.orderPlaced.connect(
+            lambda ot, s, v: LOG.info("Order placed: %s %s %s", ot, s, v)
+        )
         dialog.exec()
 
     def place_order(self):
-        """Open place order dialog"""
-        # Open order dialog with default order type (can be BUY or SELL based on current price)
-        # Let's open it without pre-selecting an order type, user can choose in dialog
-        from MarketWatch_jetfyx.dialogs.order_dialog import OrderDialog
-        
-        default_lot = self.app_settings.get('default_lot', 0.01) if self.app_settings.get('default_lot_enabled', False) else self.current_lot
-        
-        dialog = OrderDialog(
-            self.symbol, 
-            self.sell_price, 
-            self.buy_price, 
-            default_lot, 
-            self.symbol_manager,
-            self.order_service,
-            self
-        )
-        dialog.orderPlaced.connect(lambda order_type, symbol, volume: 
-            LOG.info("Dialog order placed from + button: %s %s %s", order_type, symbol, volume))
-        dialog.exec()
+        self.open_order_dialog("BUY")
 
     def update_prices(self, sell_price, buy_price, hub_received_timestamp=None):
-        """Update the displayed sell and buy prices in the panel. Log latency if timestamp is provided."""
         import time
         self.sell_price = sell_price
-        self.buy_price = buy_price
+        self.buy_price  = buy_price
         self.sell_btn.setText(f"SELL\n{sell_price}")
         self.buy_btn.setText(f"BUY\n{buy_price}")
+        self.symbol_label.setText(f"{self.symbol} ({sell_price})")
         if hub_received_timestamp:
-            latency = (time.time() - hub_received_timestamp) * 1000  # ms
-            LOG.debug("[Latency] TradePanel Buttons: %s latency = %.2f ms", self.symbol, latency)
+            latency = (time.time() - hub_received_timestamp) * 1000
+            LOG.debug("[Latency] TradePanel %s = %.2f ms", self.symbol, latency)
 
     def on_price_update(self, symbol, sell, buy):
         if symbol != self.symbol:

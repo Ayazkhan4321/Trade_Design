@@ -3,7 +3,6 @@ from PySide6.QtWidgets import (
 )
 from PySide6.QtCore import Qt
 
-from .top_bar import TopBar
 from .order_table import OrderTable
 
 
@@ -110,9 +109,9 @@ class OrderDock(QDockWidget):
         self.setWidget(container)
 
     def _on_tab_changed(self, name: str):
-        # Update button visibility based on selected tab
+        # Update button visibility via OrdersWidget directly
         try:
-            self.top_bar.update_buttons(name)
+            self.orders_widget.on_tab_changed(name)
         except Exception:
             pass
 
@@ -130,7 +129,9 @@ class OrderDock(QDockWidget):
 
             if not active:
                 try:
-                    active = self.top_bar.tabbar.tabText(self.top_bar.tabbar.currentIndex())
+                    tb = getattr(self.orders_widget, 'tabbar', None)
+                    if tb is not None:
+                        active = tb.tabText(tb.currentIndex())
                 except Exception:
                     active = None
 
@@ -166,8 +167,11 @@ class OrderDock(QDockWidget):
     def _open_funnel(self):
         # Open funnel only when in History or Logs
         try:
+            active = None
             try:
-                active = self.top_bar.tabbar.tabText(self.top_bar.tabbar.currentIndex())
+                tb = getattr(self.orders_widget, 'tabbar', None)
+                if tb is not None:
+                    active = tb.tabText(tb.currentIndex())
             except Exception:
                 active = None
 

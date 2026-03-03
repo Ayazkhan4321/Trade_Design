@@ -8,6 +8,15 @@ from Forgot_password.forgot_password_controller import ForgotPasswordDialog
 import auth.session as session
 import logging
 
+# --- Theme system ---
+try:
+    from Theme.theme_manager import ThemeManager
+    from Theme.theme_applier import ThemeApplier
+    from Theme.theme_popup import ThemePopup
+    _THEME_AVAILABLE = True
+except Exception:
+    _THEME_AVAILABLE = False
+
 # Lazy imports for left panel integration (kept optional so app still runs without Left_panel)
 try:
     import os, sys
@@ -50,6 +59,18 @@ class MainWindow(QMainWindow):
 
         # ---- Status bar ----
         self.status_manager = StatusBarManager(self.ui.statusBar)
+
+        # ---- Theme system ----
+        self._theme_popup = None
+        if _THEME_AVAILABLE:
+            try:
+                mgr = ThemeManager.instance()
+                ApplierCls = ThemeApplier
+                ApplierCls.apply_to_app(mgr.tokens())
+                mgr.theme_changed.connect(lambda name, t: ApplierCls.apply_to_app(t))
+                self._theme_popup = ThemePopup(parent=self)
+            except Exception as e:
+                logging.getLogger(__name__).debug("Theme init failed: %s", e)
 
         # Track sign-in state
         self._signed_in_user = None
@@ -182,11 +203,61 @@ class MainWindow(QMainWindow):
                 except Exception:
                     pass
 
+    def _setup_theme_toolbar_button(self):
+        """
+        Move the palette/theme action to the far RIGHT of the toolbar
+        by removing it from its current position, adding an expanding
+        spacer widget, then re-adding the action at the end.
+        """
+        try:
+            from PySide6.QtWidgets import QWidget as _QWidget, QSizePolicy as _QSP, QToolButton as _QTB
+            tb = self.ui.toolBar
+
+            # Remove existing actiontheme from wherever it currently sits
+            tb.removeAction(self.ui.actiontheme)
+
+            # Expanding spacer pushes everything after it to the right
+            spacer = _QWidget(self)
+            spacer.setSizePolicy(_QSP.Expanding, _QSP.Preferred)
+            spacer.setObjectName("toolbar_spacer")
+            tb.addWidget(spacer)
+
+            # Re-add theme action at the far right
+            tb.addAction(self.ui.actiontheme)
+
+            # Connect directly (safe to call multiple times – Qt deduplicates)
+            try:
+                self.ui.actiontheme.triggered.disconnect()
+            except Exception:
+                pass
+            self.ui.actiontheme.triggered.connect(self.open_theme_popup)
+        except Exception as e:
+            logging.getLogger(__name__).debug("Could not move theme button: %s", e)
+
     def _connect_actions(self):
         self.ui.actionExit.triggered.connect(self.close)
-        # Keep the open account action for login
         self.ui.actionOpen_an_Account.triggered.connect(self._open_login_dialog)
-        # (Removed Market Watch action connection)
+
+        # Move theme icon to rightmost toolbar position and connect it
+        self._setup_theme_toolbar_button()
+
+        # Also wire View menu if the action exists in the .ui file
+        try:
+            self.ui.actionTheme_Settings.triggered.connect(self.open_theme_popup)
+        except Exception:
+            pass
+        # Add dynamically to View menu (shows "Theme Settings" menu item)
+        try:
+            theme_action = QAction("Theme Settings", self)
+            theme_action.triggered.connect(self.open_theme_popup)
+            self.ui.menuView.addAction(theme_action)
+        except Exception:
+            pass
+
+    def open_theme_popup(self):
+        """Show / hide the theme settings slide-in popup."""
+        if self._theme_popup is not None:
+            self._theme_popup.toggle_popup()
 
     def _create_orders_dock(self):
         """Create and dock the Orders panel. Safe to call multiple times."""
@@ -512,6 +583,3 @@ class MainWindow(QMainWindow):
             pass
 
         return super().resizeEvent(event)
-
-
-
