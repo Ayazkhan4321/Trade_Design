@@ -1,7 +1,7 @@
 {
   "Remark": true,
-  "Swap": true,
-  "Commission": true,
+  "Swap": false,
+  "Commission": false,
   "Entry Value": false,
   "Market Value": true,
   "P/L in %": true,
