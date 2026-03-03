@@ -29,18 +29,17 @@ class OrderDialog(QDialog):
         self.symbol_manager = symbol_manager
         self.order_service = order_service
 
-        # 🟢 FIX: Remove OS Title bar and make background translucent
         self.setWindowFlags(Qt.Dialog | Qt.FramelessWindowHint)
         self.setAttribute(Qt.WA_TranslucentBackground)
 
-        self.setFixedSize(SIZES['dialog_width'], SIZES['dialog_height'])
-        
+        # ── Tight size — wraps content with no dead space ────────
+        self.setFixedSize(460, 480)
+
         self._drag_pos = None
 
         self.setup_ui(default_lot)
         self.apply_theme()
 
-        # Live theme updates
         if _THEME_AVAILABLE:
             try:
                 ThemeManager.instance().theme_changed.connect(
@@ -49,7 +48,6 @@ class OrderDialog(QDialog):
             except Exception:
                 pass
 
-        # Connect to live price updates
         self._price_conn = False
         if self.symbol_manager:
             try:
@@ -59,7 +57,7 @@ class OrderDialog(QDialog):
                 self._price_conn = False
 
     # ------------------------------------------------------------------ #
-    # Custom Drag Logic for Frameless Window                                #
+    # Drag Logic
     # ------------------------------------------------------------------ #
     def mousePressEvent(self, event):
         if event.button() == Qt.LeftButton and hasattr(self, 'header_widget') and self.header_widget.geometry().contains(event.pos()):
@@ -78,7 +76,7 @@ class OrderDialog(QDialog):
         super().mouseReleaseEvent(event)
 
     # ------------------------------------------------------------------ #
-    # Theme                                                                #
+    # Theme
     # ------------------------------------------------------------------ #
     def _tokens(self) -> dict:
         if _THEME_AVAILABLE:
@@ -91,26 +89,23 @@ class OrderDialog(QDialog):
     def apply_theme(self):
         t = self._tokens()
 
-        bg       = t.get("bg_panel",        "#ffffff") 
-        text_p   = t.get("text_primary",    "#1a202c")
-        text_s   = t.get("text_secondary",  "#4a5568")
-        border   = t.get("border_primary",  "#e5e7eb")
-        accent   = t.get("accent",          "#1976d2")
-        is_dark  = t.get("is_dark", "false") == "true"
-        
-        # Safe contrast for header text
+        bg      = t.get("bg_panel",        "#ffffff")
+        text_p  = t.get("text_primary",    "#1a202c")
+        text_s  = t.get("text_secondary",  "#4a5568")
+        border  = t.get("border_primary",  "#e5e7eb")
+        accent  = t.get("accent",          "#1976d2")
+        is_dark = t.get("is_dark", "false") == "true"
+
         acc_t    = "#ffffff" if is_dark else t.get("accent_text", "#ffffff")
         if "crazy" in t.get("current_theme", "") or not is_dark:
             acc_t = "#ffffff"
-            
+
         bg_hover = t.get("bg_button_hover", "#e2e8f0")
-        
-        # Enforce dark mode specific fixes if tokens are weak
+
         if is_dark:
-            if border == "#e5e7eb": border = "#374151"
+            if border   == "#e5e7eb": border   = "#374151"
             if bg_hover == "#e2e8f0": bg_hover = "#4a5568"
 
-        # Main Container
         self.setStyleSheet(f"""
             QFrame#MainContainer {{
                 background-color: {bg};
@@ -128,19 +123,16 @@ class OrderDialog(QDialog):
             }}
         """)
 
-        # Symbol label
         if hasattr(self, "symbol_label"):
             self.symbol_label.setStyleSheet(
-                f"font-size: 20px; font-weight: bold; color: {acc_t}; background: transparent;"
+                f"font-size: 16px; font-weight: bold; color: {acc_t}; background: transparent;"
             )
 
-        # Subtitle
         if hasattr(self, "subtitle_label"):
             self.subtitle_label.setStyleSheet(
-                f"color: {acc_t}; font-size: 12px; background: transparent; opacity: 0.85;"
+                f"color: {acc_t}; font-size: 11px; background: transparent; opacity: 0.85;"
             )
 
-        # 🟢 FIX: Modernized Tabs. No background blocks, just clean bottom-borders for better dark mode!
         if hasattr(self, "tabs"):
             self.tabs.setStyleSheet(f"""
                 QTabWidget::pane {{
@@ -149,8 +141,8 @@ class OrderDialog(QDialog):
                     background: transparent;
                 }}
                 QTabBar::tab {{
-                    padding: 8px 30px;
-                    font-size: 13px;
+                    padding: 6px 20px;
+                    font-size: 12px;
                     font-weight: 600;
                     color: {text_s};
                     background: transparent;
@@ -166,69 +158,69 @@ class OrderDialog(QDialog):
                 }}
             """)
 
-        # Symbol dropdown button
         if hasattr(self, "symbol_dropdown"):
             self.symbol_dropdown.setStyleSheet(f"""
                 QPushButton {{
-                    background: transparent;
-                    border: 1px solid rgba(255, 255, 255, 0.4);
+                    background: rgba(255, 255, 255, 0.20);
+                    border: 1.5px solid rgba(255, 255, 255, 0.75);
                     border-radius: 4px;
-                    font-size: 14px;
+                    font-size: 11px;
                     font-weight: bold;
-                    color: {acc_t};
+                    color: #ffffff;
                 }}
                 QPushButton:hover {{
-                    background: rgba(0,0,0,0.15);
-                    border-color: {acc_t};
+                    background: rgba(255, 255, 255, 0.35);
+                    border-color: #ffffff;
                 }}
             """)
 
-        # Info button
         if hasattr(self, "info_btn"):
             self.info_btn.setStyleSheet(f"""
                 QPushButton {{
-                    background: transparent;
-                    border: 1px solid rgba(255, 255, 255, 0.4);
-                    border-radius: 4px;
-                    font-size: 16px;
+                    background: rgba(255, 255, 255, 0.20);
+                    border: 1.5px solid rgba(255, 255, 255, 0.75);
+                    border-radius: 12px;
+                    font-size: 12px;
                     font-weight: bold;
-                    color: {acc_t};
+                    color: #ffffff;
                 }}
                 QPushButton:hover {{
-                    background: rgba(0,0,0,0.15);
+                    background: rgba(255, 255, 255, 0.35);
+                    border-color: #ffffff;
                 }}
             """)
 
-        # Close button (Massively increased font size!)
         if hasattr(self, "close_btn"):
-            self.close_btn.setStyleSheet(f"""
-                QPushButton {{
-                    background: transparent;
-                    border: none;
-                    border-radius: 4px;
-                    font-size: 24px;  
-                    font-weight: bold;
-                    color: {acc_t};
-                }}
-                QPushButton:hover {{
-                    background: rgba(0,0,0,0.15);
-                }}
+            self.close_btn.setStyleSheet("""
+                QPushButton {
+                    background: rgba(255, 255, 255, 0.25);
+                    border: 2px solid #ffffff;
+                    border-radius: 5px;
+                    font-size: 14px;
+                    font-weight: 900;
+                    color: #ffffff;
+                }
+                QPushButton:hover {
+                    background: rgba(220, 50, 50, 0.90);
+                    border-color: #ffffff;
+                }
             """)
 
     # ------------------------------------------------------------------ #
-    # UI construction                                                       #
+    # UI construction
     # ------------------------------------------------------------------ #
     def setup_ui(self, default_lot):
         outer_layout = QVBoxLayout(self)
         outer_layout.setContentsMargins(0, 0, 0, 0)
-        
+
         self.main_container = QFrame(self)
         self.main_container.setObjectName("MainContainer")
         outer_layout.addWidget(self.main_container)
 
         layout = QVBoxLayout(self.main_container)
-        layout.setSpacing(10)
-        layout.setContentsMargins(0, 0, 0, 15)
+        # ── Tighter spacing & bottom margin ─────────────────────
+        layout.setSpacing(6)
+        layout.setContentsMargins(0, 0, 0, 8)
 
         self.header_widget = self._create_header()
 
@@ -236,10 +228,11 @@ class OrderDialog(QDialog):
         self.subtitle_label.setAlignment(Qt.AlignCenter)
 
         self.tabs = QTabWidget()
-        
+
         tab_container = QWidget()
         tab_layout = QVBoxLayout(tab_container)
-        tab_layout.setContentsMargins(15, 0, 15, 0)
+        # ── Reduced tab container margins ───────────────────────
+        tab_layout.setContentsMargins(10, 0, 10, 0)
         tab_layout.addWidget(self.tabs)
 
         self.market_form = MarketOrderForm(
@@ -256,8 +249,7 @@ class OrderDialog(QDialog):
         self.tabs.addTab(self.limit_form, "Limit / Stop Order")
 
         layout.addWidget(self.header_widget)
-        
-        # We put subtitle inside the dark header visually
+
         subtitle_layout = QHBoxLayout()
         subtitle_layout.addWidget(self.subtitle_label)
         self.header_widget.layout().addLayout(subtitle_layout)
@@ -267,26 +259,27 @@ class OrderDialog(QDialog):
     def _create_header(self):
         header_widget = QWidget(self)
         header_widget.setObjectName("HeaderWidget")
-        
+
         main_header_layout = QVBoxLayout(header_widget)
-        main_header_layout.setContentsMargins(15, 10, 15, 10)
-        main_header_layout.setSpacing(5)
-        
+        # ── Reduced header padding ───────────────────────────────
+        main_header_layout.setContentsMargins(12, 8, 12, 6)
+        main_header_layout.setSpacing(2)
+
         header = QHBoxLayout()
         header.addStretch()
 
         symbol_container = QHBoxLayout()
-        symbol_container.setSpacing(8)
+        symbol_container.setSpacing(6)
 
         self.symbol_label = QLabel(self.symbol)
 
-        # 🟢 FIX: Used highly compatible characters to prevent missing font boxes
         self.symbol_dropdown = QPushButton("▼")
-        self.symbol_dropdown.setFixedSize(30, 30)
+        # ── Smaller header buttons ───────────────────────────────
+        self.symbol_dropdown.setFixedSize(24, 24)
         self.symbol_dropdown.clicked.connect(self.open_symbol_search)
 
         self.info_btn = QPushButton("i")
-        self.info_btn.setFixedSize(30, 30)
+        self.info_btn.setFixedSize(24, 24)
 
         symbol_container.addWidget(self.symbol_label)
         symbol_container.addWidget(self.symbol_dropdown)
@@ -295,19 +288,19 @@ class OrderDialog(QDialog):
         header.addLayout(symbol_container)
         header.addStretch()
 
-        # 🟢 FIX: Capital "X", 36x36 size for easy clicking
         self.close_btn = QPushButton("X")
-        self.close_btn.setFixedSize(36, 36)
+        # ── Larger close button for visibility ──────────────────
+        self.close_btn.setFixedSize(30, 30)
         self.close_btn.setCursor(Qt.PointingHandCursor)
         self.close_btn.clicked.connect(self.reject)
 
         header.addWidget(self.close_btn)
         main_header_layout.addLayout(header)
-        
+
         return header_widget
 
     # ------------------------------------------------------------------ #
-    # Behaviour                                                             #
+    # Behaviour (unchanged)
     # ------------------------------------------------------------------ #
     def open_symbol_search(self):
         from MarketWatch_jetfyx.dialogs.symbol_search_dialog import SymbolSearchDialog
