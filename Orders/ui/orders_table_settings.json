@@ -5,5 +5,5 @@
   "Swap": false,
   "P/L in %": false,
   "Remarks": false,
-  "Multi-Target SL/TP": false
+  "Multi-Target SL/TP": true
 }

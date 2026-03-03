@@ -127,7 +127,7 @@ class OrderModel(QAbstractTableModel):
         self.orders.append(order)
         self.endInsertRows()
         LOG.info("OrderModel added order id=%s symbol=%s total_rows=%s", order.get('id'), order.get('symbol'), len(self.orders))
-
+  
 
     def remove_order_by_id(self, order_id):
         """Remove an order from the model by its id (if present) and notify views."""

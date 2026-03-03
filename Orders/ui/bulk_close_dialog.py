@@ -327,44 +327,43 @@ class BulkCloseDialog(QDialog):
             self.close_btn.setText(btn_text)
         except Exception:
             pass
-
     def _on_close(self):
-        ids = self._selected_order_ids()
-        if not ids:
-            LOG.info("No orders selected for bulk close")
-            return
-
-        payload = {"orderIds": ids}
-        headers = {}
-        token = session.get_token()
-        if token:
-            headers['Authorization'] = f"Bearer {token}"
-        try:
-            LOG.debug("Posting bulk close payload: %s", payload)
-            resp = requests.post(API_ORDERS_BULK_CLOSE, json=payload, headers=headers, timeout=API_TIMEOUT, verify=API_VERIFY_TLS)
-            LOG.info("Bulk close status: %s", getattr(resp, 'status_code', None))
-            if resp.status_code in (200, 201):
-                # Refresh orders via service if available
-                try:
-                    if self.order_service is not None and callable(getattr(self.order_service, 'fetch_orders', None)):
-                        new = self.order_service.fetch_orders()
-                        if self.model is not None and hasattr(self.model, 'clear_orders'):
-                            try:
-                                self.model.clear_orders()
-                                for o in new:
-                                    try:
-                                        self.model.add_order(o)
-                                    except Exception:
-                                        pass
-                            except Exception:
-                                pass
-                except Exception:
-                    LOG.exception("Failed refreshing orders after bulk close")
-                self.accept()
-            else:
-                try:
-                    LOG.error("Bulk close failed: %s", resp.text)
-                except Exception:
-                    LOG.exception("Bulk close failed")
-        except Exception:
-            LOG.exception("Exception while calling bulk close endpoint")
+            ids = self._selected_order_ids()
+            if not ids:
+                LOG.info("No orders selected for bulk close")
+                return
+    
+            payload = {"orderIds": ids}
+            headers = {}
+            token = session.get_token()
+            if token:
+                headers['Authorization'] = f"Bearer {token}"
+            try:
+                LOG.debug("Posting bulk close payload: %s", payload)
+                resp = requests.post(API_ORDERS_BULK_CLOSE, json=payload, headers=headers, timeout=API_TIMEOUT, verify=API_VERIFY_TLS)
+                LOG.info("Bulk close status: %s", getattr(resp, 'status_code', None))
+                if resp.status_code in (200, 201):
+                    # Refresh orders via service if available
+                    try:
+                        if self.order_service is not None and callable(getattr(self.order_service, 'fetch_orders', None)):
+                            new = self.order_service.fetch_orders()
+                            if self.model is not None and hasattr(self.model, 'clear_orders'):
+                                try:
+                                    self.model.clear_orders()
+                                    for o in new:
+                                        try:
+                                            self.model.add_order(o)
+                                        except Exception:
+                                            pass
+                                except Exception:
+                                    pass
+                    except Exception:
+                        LOG.exception("Failed refreshing orders after bulk close")
+                    self.accept()
+                else:
+                    try:
+                        LOG.error("Bulk close failed: %s", resp.text)
+                    except Exception:
+                        LOG.exception("Bulk close failed")
+            except Exception:
+                LOG.exception("Exception while calling bulk close endpoint")
