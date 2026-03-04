@@ -1,5 +1,5 @@
 {
-  "theme": "time",
+  "theme": "system",
   "crazy_color": "green",
   "time_period_overrides": {
     "morning": "crazy_green",
