@@ -1,9 +1,0 @@
-{
-    "python.defaultInterpreterPath": "C:\\Users\\hp\\miniconda3\\Ana\\envs\\pyside310\\python.exe",
-    "python.linting.enabled": true,
-    "python.linting.pylintEnabled": false,
-    "[python]": {
-        "editor.defaultFormatter": "ms-python.python",
-        "editor.formatOnSave": false
-    }
-}
