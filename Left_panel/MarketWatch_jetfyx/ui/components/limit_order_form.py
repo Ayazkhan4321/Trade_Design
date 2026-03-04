@@ -3,12 +3,10 @@ Limit/Stop Order Form Component - Form for placing limit and stop orders
 """
 from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel, 
-    QPushButton, QTextEdit, QCheckBox, QComboBox
+    QPushButton, QTextEdit, QCheckBox, QDoubleSpinBox, QFrame
 )
 from PySide6.QtCore import Qt, Signal
-from MarketWatch_jetfyx.ui.components.volume_control import VolumeControl
-from MarketWatch_jetfyx.ui.components.numeric_input import NumericInput
-from MarketWatch_jetfyx.config.ui_config import BUTTON_STYLES, SIZES
+from MarketWatch_jetfyx.config.ui_config import BUTTON_STYLES
 import logging
 
 LOG = logging.getLogger(__name__)
@@ -27,178 +25,330 @@ class LimitOrderForm(QWidget):
         self.buy_price = buy_price
         
         self.setup_ui(default_lot)
-    
+        self._apply_theme()
+        
+        # Subscribe to dynamic theme changes
+        try:
+            from Theme.theme_manager import ThemeManager
+            ThemeManager.instance().theme_changed.connect(lambda n, t: self._apply_theme())
+        except Exception:
+            pass
+            
+    # ──────────────────────────────────────────────────────────────
+    # Theme
+    # ──────────────────────────────────────────────────────────────
+    def _apply_theme(self):
+        """Apply dynamic theme colors"""
+        try:
+            from Theme.theme_manager import ThemeManager
+            tok      = ThemeManager.instance().tokens()
+            bg_input = tok.get("bg_input",      "#f5f5f5")
+            text_pri = tok.get("text_primary",  "#1a202c")
+            text_sec = tok.get("text_secondary","#6b7280")
+            border   = tok.get("border_primary","#e5e7eb")
+            bg_hover = tok.get("bg_button_hover", "#e2e8f0")
+            accent   = tok.get("accent",        "#1976d2")
+            is_dark  = tok.get("is_dark", "false") == "true"
+        except Exception:
+            bg_input, text_pri, text_sec, border, bg_hover, accent, is_dark = (
+                "#f5f5f5", "#1a202c", "#6b7280", "#e5e7eb", "#e2e8f0", "#1976d2", False
+            )
+
+        if is_dark:
+            if border   == "#e5e7eb": border   = "#374151"
+            if bg_input == "#f5f5f5": bg_input = "#1f2937"
+            if bg_hover == "#e2e8f0": bg_hover = "#4a5568"
+
+        self.setStyleSheet(f"""
+            LimitOrderForm {{ background: transparent; }}
+
+            QLabel#FormLabel {{
+                font-weight: 600;
+                font-size: 10px;
+                color: {text_sec};
+                letter-spacing: 0.5px;
+                text-transform: uppercase;
+            }}
+
+            QLabel#FormValue {{
+                background-color: {bg_input};
+                border: 1px solid {border};
+                border-radius: 5px;
+                font-size: 11px;
+                color: {text_pri};
+                padding: 2px 6px;
+            }}
+
+            QTextEdit {{
+                background-color: {bg_input};
+                border: 1px solid {border};
+                border-radius: 5px;
+                font-size: 11px;
+                color: {text_pri};
+                padding: 2px 6px;
+            }}
+            QTextEdit:focus {{
+                border: 1px solid {accent};
+                outline: none;
+            }}
+
+            /* ── Checkbox Styling ── */
+            QCheckBox {{
+                font-size: 11px;
+                color: {text_sec};
+                font-weight: 600;
+            }}
+            QCheckBox::indicator {{
+                width: 14px;
+                height: 14px;
+                border: 1px solid {border};
+                border-radius: 3px;
+                background: {bg_input};
+            }}
+            QCheckBox::indicator:checked {{
+                background: {accent};
+                border-color: {accent};
+            }}
+
+            /* ── Global Stitched Input Styling for Volume, Entry, SL, and TP ── */
+            QPushButton#StitchedBtnLeft, QPushButton#StitchedBtnRight {{
+                background-color: {bg_hover};
+                border: 1px solid {border};
+                color: {text_pri};
+                font-family: "Segoe UI Symbol", Arial, sans-serif;
+                font-size: 12px;
+                padding: 0px; 
+                margin: 0px;
+            }}
+            QPushButton#StitchedBtnLeft:hover, QPushButton#StitchedBtnRight:hover {{
+                background-color: {border};
+            }}
+            QPushButton#StitchedBtnLeft {{
+                border-top-left-radius: 4px;
+                border-bottom-left-radius: 4px;
+                border-right: none; 
+            }}
+            QPushButton#StitchedBtnRight {{
+                border-top-right-radius: 4px;
+                border-bottom-right-radius: 4px;
+                border-left: none; 
+            }}
+
+            QDoubleSpinBox#StitchedInput {{
+                background-color: {bg_input};
+                border: 1px solid {border};
+                border-radius: 0px;
+                color: {text_pri};
+                font-size: 11px;
+                font-weight: bold;
+            }}
+            QDoubleSpinBox#StitchedInput:focus {{
+                border-top: 1px solid {accent};
+                border-bottom: 1px solid {accent};
+                outline: none;
+            }}
+            
+            QDoubleSpinBox::up-button, QDoubleSpinBox::down-button {{
+                width: 0px;
+                background: transparent;
+                border: none;
+            }}
+
+            QFrame#Separator {{
+                color: {border};
+                background-color: {border};
+                max-height: 1px;
+                border: none;
+            }}
+
+            QLabel#InfoLabel {{
+                font-size: 9px;
+                color: {text_sec};
+                letter-spacing: 0.3px;
+            }}
+            QLabel#InfoValue {{
+                font-size: 10px;
+                color: {text_pri};
+                font-weight: 600;
+            }}
+        """)
+
+    # ──────────────────────────────────────────────────────────────
+    # Layout
+    # ──────────────────────────────────────────────────────────────
     def setup_ui(self, default_lot):
         """Setup the form UI"""
         layout = QVBoxLayout(self)
-        layout.setSpacing(15)
-        layout.setContentsMargins(15, 15, 15, 15)
+        layout.setSpacing(5)
+        layout.setContentsMargins(8, 6, 8, 6)
         
-        # Top row: Volume, Contract Value, Margin
-        top_row = self._create_top_row(default_lot)
+        layout.addSpacing(4)
+        layout.addLayout(self._create_top_row(default_lot))
+        layout.addLayout(self._create_price_row())
+        layout.addLayout(self._create_expiration_row())
+        layout.addLayout(self._create_buttons_row())
+        layout.addSpacing(4)
+        layout.addWidget(self._create_remarks_section())
+        layout.addSpacing(4)
+        layout.addWidget(self._make_separator())
+        layout.addSpacing(4)
+        layout.addLayout(self._create_info_row())
         
-        # Entry Price, Stop Loss, Take Profit row
-        price_row = self._create_price_row()
-        
-        # Expiration Date & Time
-        expiration_row = self._create_expiration_row()
-        
-        # Buy/Sell buttons
-        buttons_row = self._create_buttons_row()
-        
-        # Remarks
-        remarks_section = self._create_remarks_section()
-        
-        # Info row
-        info_row = self._create_info_row()
-        
-        # Add all to layout
-        layout.addLayout(top_row)
-        layout.addLayout(price_row)
-        layout.addLayout(expiration_row)
-        layout.addLayout(buttons_row)
-        layout.addWidget(remarks_section)
-        layout.addLayout(info_row)
+        from PySide6.QtWidgets import QSizePolicy
+        self.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
+
+    def _make_separator(self):
+        sep = QFrame()
+        sep.setObjectName("Separator")
+        sep.setFrameShape(QFrame.HLine)
+        sep.setFixedHeight(1)
+        return sep
     
+    # ── Rows ────────────────────────────────────────────────────
     def _create_top_row(self, default_lot):
-        """Create Volume, Contract Value, Margin row"""
+        """Volume | Contract Value | Margin"""
         row = QHBoxLayout()
-        row.setSpacing(10)
+        row.setSpacing(8)
         
-        # Volume
-        self.volume_control = VolumeControl(default_lot)
-        
-        # Contract Value
-        contract_value_container = self._create_info_field("Contract Value", "≈1000.00 USD")
-        
-        # Margin
-        margin_container = self._create_info_field("Margin", "≈ 11.68880")
-        
-        row.addWidget(self.volume_control)
-        row.addLayout(contract_value_container)
-        row.addLayout(margin_container)
-        
+        vol_col = QVBoxLayout()
+        vol_col.setSpacing(3)
+
+        vol_label = QLabel("Volume")
+        vol_label.setObjectName("FormLabel")
+
+        vol_ctrl = QHBoxLayout()
+        vol_ctrl.setSpacing(0)
+
+        vol_down = QPushButton("▼")
+        vol_down.setObjectName("StitchedBtnLeft")
+        vol_down.setFixedSize(28, 26)
+
+        self.volume_input = QDoubleSpinBox()
+        self.volume_input.setObjectName("StitchedInput")
+        self.volume_input.setDecimals(2)
+        self.volume_input.setMinimum(0.01)
+        self.volume_input.setMaximum(100.0)
+        self.volume_input.setSingleStep(0.01)
+        self.volume_input.setValue(default_lot)
+        self.volume_input.setAlignment(Qt.AlignCenter)
+        self.volume_input.setFixedHeight(26)
+
+        vol_up = QPushButton("▲")
+        vol_up.setObjectName("StitchedBtnRight")
+        vol_up.setFixedSize(28, 26)
+
+        vol_down.clicked.connect(lambda: self.volume_input.setValue(max(0.01, self.volume_input.value() - 0.01)))
+        vol_up.clicked.connect(lambda: self.volume_input.setValue(min(100.0, self.volume_input.value() + 0.01)))
+
+        vol_ctrl.addWidget(vol_down)
+        vol_ctrl.addWidget(self.volume_input)
+        vol_ctrl.addWidget(vol_up)
+
+        vol_col.addWidget(vol_label)
+        vol_col.addLayout(vol_ctrl)
+
+        row.addLayout(vol_col)
+        row.addLayout(self._create_info_field("Contract Value", "≈1000.00 USD"))
+        row.addLayout(self._create_info_field("Margin", "≈ 11.68880"))
         return row
     
     def _create_price_row(self):
-        """Create Entry Price, Stop Loss, Take Profit row"""
+        """Stop Loss | Entry Price | Take Profit"""
         row = QHBoxLayout()
-        row.setSpacing(10)
+        row.setSpacing(6)
         
         # Stop Loss
-        self.stop_loss_input = NumericInput(
-            label_text="",
-            placeholder="Stop Loss",
-            default_value=0.0,
-            decimals=5
-        )
+        sl_ctrl = QHBoxLayout(); sl_ctrl.setSpacing(0)
+        sl_down = QPushButton("▼"); sl_down.setObjectName("StitchedBtnLeft"); sl_down.setFixedSize(24, 26)
+        self.stop_loss_input = QDoubleSpinBox()
+        self.stop_loss_input.setObjectName("StitchedInput")
+        self.stop_loss_input.setDecimals(5); self.stop_loss_input.setMinimum(0.0); self.stop_loss_input.setMaximum(999999.0)
+        self.stop_loss_input.setSingleStep(0.0001); self.stop_loss_input.setValue(0.0)
+        self.stop_loss_input.setSpecialValueText("Stop Loss")
+        self.stop_loss_input.setAlignment(Qt.AlignCenter); self.stop_loss_input.setFixedHeight(26)
+        sl_up = QPushButton("▲"); sl_up.setObjectName("StitchedBtnRight"); sl_up.setFixedSize(24, 26)
+        sl_down.clicked.connect(lambda: self.stop_loss_input.setValue(max(0.0, self.stop_loss_input.value() - 0.0001)))
+        sl_up.clicked.connect(lambda: self.stop_loss_input.setValue(min(999999.0, self.stop_loss_input.value() + 0.0001)))
+        sl_ctrl.addWidget(sl_down); sl_ctrl.addWidget(self.stop_loss_input); sl_ctrl.addWidget(sl_up)
         
         # Entry Price
-        self.entry_price_input = NumericInput(
-            label_text="",
-            placeholder="Entry Price",
-            default_value=float(self.sell_price) if self.sell_price else 0.0,
-            decimals=5
-        )
-        self.entry_price_input.set_value(float(self.sell_price) if self.sell_price else 0.0)
+        ep_ctrl = QHBoxLayout(); ep_ctrl.setSpacing(0)
+        ep_down = QPushButton("▼"); ep_down.setObjectName("StitchedBtnLeft"); ep_down.setFixedSize(24, 26)
+        self.entry_price_input = QDoubleSpinBox()
+        self.entry_price_input.setObjectName("StitchedInput")
+        self.entry_price_input.setDecimals(5); self.entry_price_input.setMinimum(0.0); self.entry_price_input.setMaximum(999999.0)
+        self.entry_price_input.setSingleStep(0.0001)
+        initial_ep = float(self.sell_price) if self.sell_price else 0.0
+        self.entry_price_input.setValue(initial_ep)
+        self.entry_price_input.setSpecialValueText("Entry Price")
+        self.entry_price_input.setAlignment(Qt.AlignCenter); self.entry_price_input.setFixedHeight(26)
+        ep_up = QPushButton("▲"); ep_up.setObjectName("StitchedBtnRight"); ep_up.setFixedSize(24, 26)
+        ep_down.clicked.connect(lambda: self.entry_price_input.setValue(max(0.0, self.entry_price_input.value() - 0.0001)))
+        ep_up.clicked.connect(lambda: self.entry_price_input.setValue(min(999999.0, self.entry_price_input.value() + 0.0001)))
+        ep_ctrl.addWidget(ep_down); ep_ctrl.addWidget(self.entry_price_input); ep_ctrl.addWidget(ep_up)
         
         # Take Profit
-        self.take_profit_input = NumericInput(
-            label_text="",
-            placeholder="Take Profit",
-            default_value=0.0,
-            decimals=5
-        )
+        tp_ctrl = QHBoxLayout(); tp_ctrl.setSpacing(0)
+        tp_down = QPushButton("▼"); tp_down.setObjectName("StitchedBtnLeft"); tp_down.setFixedSize(24, 26)
+        self.take_profit_input = QDoubleSpinBox()
+        self.take_profit_input.setObjectName("StitchedInput")
+        self.take_profit_input.setDecimals(5); self.take_profit_input.setMinimum(0.0); self.take_profit_input.setMaximum(999999.0)
+        self.take_profit_input.setSingleStep(0.0001); self.take_profit_input.setValue(0.0)
+        self.take_profit_input.setSpecialValueText("Take Profit")
+        self.take_profit_input.setAlignment(Qt.AlignCenter); self.take_profit_input.setFixedHeight(26)
+        tp_up = QPushButton("▲"); tp_up.setObjectName("StitchedBtnRight"); tp_up.setFixedSize(24, 26)
+        tp_down.clicked.connect(lambda: self.take_profit_input.setValue(max(0.0, self.take_profit_input.value() - 0.0001)))
+        tp_up.clicked.connect(lambda: self.take_profit_input.setValue(min(999999.0, self.take_profit_input.value() + 0.0001)))
+        tp_ctrl.addWidget(tp_down); tp_ctrl.addWidget(self.take_profit_input); tp_ctrl.addWidget(tp_up)
         
-        row.addWidget(self.stop_loss_input)
-        row.addWidget(self.entry_price_input)
-        row.addWidget(self.take_profit_input)
-        
+        row.addLayout(sl_ctrl)
+        row.addLayout(ep_ctrl)
+        row.addLayout(tp_ctrl)
         return row
     
     def _create_expiration_row(self):
         """Create Expiration Date & Time row"""
         row = QHBoxLayout()
-        row.setSpacing(10)
+        row.setSpacing(8)
         
-        # Label
-        label = QLabel("Expiration Date & Time")
-        label.setStyleSheet("font-size: 13px; color: #666;")
-        
-        # Checkbox
-        self.expiration_checkbox = QCheckBox()
-        self.expiration_checkbox.setStyleSheet("""
-            QCheckBox::indicator {
-                width: 20px;
-                height: 20px;
-                border: 2px solid #ddd;
-                border-radius: 4px;
-            }
-            QCheckBox::indicator:checked {
-                background: #1976d2;
-                border-color: #1976d2;
-            }
-        """)
+        self.expiration_checkbox = QCheckBox("Expiration Date & Time")
         
         row.addStretch()
-        row.addWidget(label)
         row.addWidget(self.expiration_checkbox)
         row.addStretch()
-        
         return row
     
     def _create_buttons_row(self):
         """Create Sell Limit / Buy Stop buttons"""
         row = QHBoxLayout()
-        row.setSpacing(10)
+        row.setSpacing(8)
         
-        # Sell Limit button
         self.sell_limit_btn = QPushButton(f"{self.sell_price}\nSell Limit")
-        self.sell_limit_btn.setFixedHeight(80)
-        self.sell_limit_btn.setStyleSheet(BUTTON_STYLES['sell'])
+        self.sell_limit_btn.setFixedHeight(52)
+        self.sell_limit_btn.setStyleSheet(BUTTON_STYLES['sell'] + " font-size: 13px; font-weight: bold;")
         self.sell_limit_btn.clicked.connect(lambda: self._submit_order("SELL_LIMIT"))
         
-        # Buy Stop button
         self.buy_stop_btn = QPushButton(f"{self.buy_price}\nBuy Stop")
-        self.buy_stop_btn.setFixedHeight(80)
-        self.buy_stop_btn.setStyleSheet(BUTTON_STYLES['buy'])
+        self.buy_stop_btn.setFixedHeight(52)
+        self.buy_stop_btn.setStyleSheet(BUTTON_STYLES['buy'] + " font-size: 13px; font-weight: bold;")
         self.buy_stop_btn.clicked.connect(lambda: self._submit_order("BUY_STOP"))
         
         row.addWidget(self.sell_limit_btn)
         row.addWidget(self.buy_stop_btn)
-        
         return row
     
     def _create_remarks_section(self):
         """Create remarks input section"""
-        container = QWidget()
-        layout = QVBoxLayout(container)
-        layout.setSpacing(5)
-        
-        label = QLabel("Remarks")
-        label.setStyleSheet("font-weight: bold; font-size: 12px; color: #666;")
-        
         self.remarks_input = QTextEdit()
         self.remarks_input.setPlaceholderText("Remarks")
-        self.remarks_input.setFixedHeight(60)
-        self.remarks_input.setStyleSheet("""
-            QTextEdit {
-                border: 1px solid #ddd;
-                border-radius: 4px;
-                padding: 5px;
-                background: white;
-            }
-        """)
-        
-        layout.addWidget(label)
-        layout.addWidget(self.remarks_input)
-        
-        return container
+        self.remarks_input.setFixedHeight(48)
+        return self.remarks_input
     
     def _create_info_row(self):
         """Create bottom info row"""
         row = QHBoxLayout()
-        row.setSpacing(20)
+        row.setSpacing(0)
+        row.setContentsMargins(0, 2, 0, 0)
         
         info_items = [
             ("Spread", "0.00014"),
@@ -207,50 +357,42 @@ class LimitOrderForm(QWidget):
             ("Daily Swap USD", "Sell: -2.79  Buy: -3.15")
         ]
         
-        for label_text, value_text in info_items:
-            container = QVBoxLayout()
-            container.setSpacing(2)
+        for i, (lbl, val) in enumerate(info_items):
+            col = QVBoxLayout()
+            col.setSpacing(1)
             
-            label = QLabel(label_text)
-            label.setStyleSheet("font-size: 11px; color: #999;")
+            label = QLabel(lbl)
+            label.setObjectName("InfoLabel")
             label.setAlignment(Qt.AlignCenter)
             
-            value = QLabel(value_text)
-            value.setStyleSheet("font-size: 11px; color: #666; font-weight: bold;")
+            value = QLabel(val)
+            value.setObjectName("InfoValue")
             value.setAlignment(Qt.AlignCenter)
             
-            container.addWidget(label)
-            container.addWidget(value)
+            col.addWidget(label)
+            col.addWidget(value)
+            row.addLayout(col)
             
-            row.addLayout(container)
-        
+            if i < len(info_items) - 1:
+                row.addStretch(1)
+                
         return row
     
     def _create_info_field(self, label_text, value_text):
         """Create an info field (Contract Value, Margin)"""
         container = QVBoxLayout()
-        container.setSpacing(5)
+        container.setSpacing(3)
         
         label = QLabel(label_text)
-        label.setStyleSheet("font-weight: bold; font-size: 12px; color: #666;")
+        label.setObjectName("FormLabel")
         
         value = QLabel(value_text)
+        value.setObjectName("FormValue")
         value.setAlignment(Qt.AlignCenter)
-        value.setFixedHeight(40)
-        value.setStyleSheet("""
-            QLabel {
-                background: #f5f5f5;
-                border: 1px solid #ddd;
-                border-radius: 4px;
-                font-size: 13px;
-                color: #333;
-                padding: 5px;
-            }
-        """)
+        value.setFixedHeight(26)
         
         container.addWidget(label)
         container.addWidget(value)
-        
         return container
     
     def _submit_order(self, order_type):
@@ -258,10 +400,10 @@ class LimitOrderForm(QWidget):
         order_data = {
             'symbol': self.symbol,
             'type': order_type,
-            'volume': self.volume_control.get_volume(),
-            'entry_price': self.entry_price_input.get_value(),
-            'stop_loss': self.stop_loss_input.get_value() if self.stop_loss_input.get_text() else None,
-            'take_profit': self.take_profit_input.get_value() if self.take_profit_input.get_text() else None,
+            'volume': self.volume_input.value(),
+            'entry_price': self.entry_price_input.value() if self.entry_price_input.value() > 0 else None,
+            'stop_loss': self.stop_loss_input.value() if self.stop_loss_input.value() > 0 else None,
+            'take_profit': self.take_profit_input.value() if self.take_profit_input.value() > 0 else None,
             'remarks': self.remarks_input.toPlainText(),
             'has_expiration': self.expiration_checkbox.isChecked(),
             'order_category': 'limit'
@@ -275,5 +417,9 @@ class LimitOrderForm(QWidget):
         self.buy_price = buy_price
         self.sell_limit_btn.setText(f"{sell_price}\nSell Limit")
         self.buy_stop_btn.setText(f"{buy_price}\nBuy Stop")
-        self.entry_price_input.set_value(float(sell_price) if sell_price else 0.0)
+        
+        # Only auto-update entry price if the user hasn't heavily modified it,
+        # or simply rely on the initial load. For now, matching standard behavior:
+        self.entry_price_input.setValue(float(sell_price) if sell_price else 0.0)
+        
         LOG.debug("LimitOrderForm update_prices: %s %s", sell_price, buy_price)

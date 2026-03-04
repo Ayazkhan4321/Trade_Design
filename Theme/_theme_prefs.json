@@ -1,5 +1,9 @@
 {
+<<<<<<< HEAD
   "theme": "system",
+=======
+  "theme": "crazy_green",
+>>>>>>> dfa2511f007c9c7c71eec799942deb5a0b33e2eb
   "crazy_color": "green",
   "time_period_overrides": {
     "morning": "crazy_green",
