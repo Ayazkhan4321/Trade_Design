@@ -3,11 +3,9 @@ Market Order Form Component - Form for placing market orders
 """
 from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel,
-    QPushButton, QTextEdit, QFrame
+    QPushButton, QTextEdit, QFrame, QDoubleSpinBox
 )
 from PySide6.QtCore import Qt, Signal
-from MarketWatch_jetfyx.ui.components.volume_control import VolumeControl
-from MarketWatch_jetfyx.ui.components.numeric_input import NumericInput
 from MarketWatch_jetfyx.config.ui_config import BUTTON_STYLES
 import logging
 
@@ -48,18 +46,21 @@ class MarketOrderForm(QWidget):
             text_pri = tok.get("text_primary",  "#1a202c")
             text_sec = tok.get("text_secondary","#6b7280")
             border   = tok.get("border_primary","#e5e7eb")
+            bg_hover = tok.get("bg_button_hover", "#e2e8f0")
+            accent   = tok.get("accent",        "#1976d2")
             is_dark  = tok.get("is_dark", "false") == "true"
         except Exception:
-            bg_input, text_pri, text_sec, border, is_dark = (
-                "#f5f5f5", "#1a202c", "#6b7280", "#e5e7eb", False
+            bg_input, text_pri, text_sec, border, bg_hover, accent, is_dark = (
+                "#f5f5f5", "#1a202c", "#6b7280", "#e5e7eb", "#e2e8f0", "#1976d2", False
             )
 
         if is_dark:
             if border   == "#e5e7eb": border   = "#374151"
             if bg_input == "#f5f5f5": bg_input = "#1f2937"
+            if bg_hover == "#e2e8f0": bg_hover = "#4a5568"
 
         self.setStyleSheet(f"""
-            QWidget {{ background: transparent; }}
+            MarketOrderForm {{ background: transparent; }}
 
             QLabel#FormLabel {{
                 font-weight: 600;
@@ -85,6 +86,54 @@ class MarketOrderForm(QWidget):
                 font-size: 11px;
                 color: {text_pri};
                 padding: 2px 6px;
+            }}
+            QTextEdit:focus {{
+                border: 1px solid {accent};
+                outline: none;
+            }}
+
+            /* 🟢 FIX: Use Segoe UI Symbol and 12px size so arrows fit perfectly */
+            QPushButton#StitchedBtnLeft, QPushButton#StitchedBtnRight {{
+                background-color: {bg_hover};
+                border: 1px solid {border};
+                color: {text_pri};
+                font-family: "Segoe UI Symbol", Arial, sans-serif;
+                font-size: 12px;
+                padding: 0px; 
+                margin: 0px;
+            }}
+            QPushButton#StitchedBtnLeft:hover, QPushButton#StitchedBtnRight:hover {{
+                background-color: {border};
+            }}
+            QPushButton#StitchedBtnLeft {{
+                border-top-left-radius: 4px;
+                border-bottom-left-radius: 4px;
+                border-right: none; 
+            }}
+            QPushButton#StitchedBtnRight {{
+                border-top-right-radius: 4px;
+                border-bottom-right-radius: 4px;
+                border-left: none; 
+            }}
+
+            QDoubleSpinBox#StitchedInput {{
+                background-color: {bg_input};
+                border: 1px solid {border};
+                border-radius: 0px;
+                color: {text_pri};
+                font-size: 12px;
+                font-weight: bold;
+            }}
+            QDoubleSpinBox#StitchedInput:focus {{
+                border-top: 1px solid {accent};
+                border-bottom: 1px solid {accent};
+                outline: none;
+            }}
+            
+            QDoubleSpinBox::up-button, QDoubleSpinBox::down-button {{
+                width: 0px;
+                background: transparent;
+                border: none;
             }}
 
             QFrame#Separator {{
@@ -115,16 +164,20 @@ class MarketOrderForm(QWidget):
         layout.setSpacing(5)
         layout.setContentsMargins(8, 6, 8, 6)
 
+        layout.addSpacing(4)
         layout.addLayout(self._create_top_row(default_lot))
         layout.addLayout(self._create_sl_tp_row())
+        layout.addSpacing(4)
         layout.addLayout(self._create_buttons_row())
-        layout.addSpacing(8)   # gap between buttons and remarks
+        layout.addSpacing(8)
         layout.addWidget(self._create_remarks_section())
         layout.addSpacing(4)
         layout.addWidget(self._make_separator())
         layout.addSpacing(4)
         layout.addLayout(self._create_info_row())
-        layout.addStretch()  # push all content to top, no gap
+        
+        from PySide6.QtWidgets import QSizePolicy
+        self.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
 
     def _make_separator(self):
         sep = QFrame()
@@ -139,9 +192,50 @@ class MarketOrderForm(QWidget):
         row = QHBoxLayout()
         row.setSpacing(8)
 
-        self.volume_control = VolumeControl(default_lot)
+        vol_col = QVBoxLayout()
+        vol_col.setSpacing(3)
 
-        row.addWidget(self.volume_control)
+        vol_label = QLabel("Volume")
+        vol_label.setObjectName("FormLabel")
+
+        vol_ctrl = QHBoxLayout()
+        vol_ctrl.setSpacing(0)
+
+        # 🟢 FIX: Restored Down Arrow
+        vol_down = QPushButton("▼")
+        vol_down.setObjectName("StitchedBtnLeft")
+        vol_down.setFixedSize(28, 26)
+
+        self.volume_input = QDoubleSpinBox()
+        self.volume_input.setObjectName("StitchedInput")
+        self.volume_input.setDecimals(2)
+        self.volume_input.setMinimum(0.01)
+        self.volume_input.setMaximum(100.0)
+        self.volume_input.setSingleStep(0.01)
+        self.volume_input.setValue(default_lot)
+        self.volume_input.setAlignment(Qt.AlignCenter)
+        self.volume_input.setFixedHeight(26)
+
+        # 🟢 FIX: Restored Up Arrow
+        vol_up = QPushButton("▲")
+        vol_up.setObjectName("StitchedBtnRight")
+        vol_up.setFixedSize(28, 26)
+
+        vol_down.clicked.connect(
+            lambda: self.volume_input.setValue(max(0.01, self.volume_input.value() - 0.01))
+        )
+        vol_up.clicked.connect(
+            lambda: self.volume_input.setValue(min(100.0, self.volume_input.value() + 0.01))
+        )
+
+        vol_ctrl.addWidget(vol_down)
+        vol_ctrl.addWidget(self.volume_input)
+        vol_ctrl.addWidget(vol_up)
+
+        vol_col.addWidget(vol_label)
+        vol_col.addLayout(vol_ctrl)
+
+        row.addLayout(vol_col)
         row.addLayout(self._create_info_field("Contract Value", "≈1000.00 USD"))
         row.addLayout(self._create_info_field("Margin", "≈ 11.69040"))
         return row
@@ -151,17 +245,70 @@ class MarketOrderForm(QWidget):
         row = QHBoxLayout()
         row.setSpacing(8)
 
-        self.stop_loss_input = NumericInput(
-            label_text="", placeholder="Stop Loss",
-            default_value=0.0, decimals=5
-        )
-        self.take_profit_input = NumericInput(
-            label_text="", placeholder="Take Profit",
-            default_value=0.0, decimals=5
-        )
+        sl_ctrl = QHBoxLayout()
+        sl_ctrl.setSpacing(0)
+        
+        # 🟢 FIX: Restored Down Arrow
+        sl_down = QPushButton("▼")
+        sl_down.setObjectName("StitchedBtnLeft")
+        sl_down.setFixedSize(28, 26)
+        
+        self.stop_loss_input = QDoubleSpinBox()
+        self.stop_loss_input.setObjectName("StitchedInput")
+        self.stop_loss_input.setDecimals(5)
+        self.stop_loss_input.setMinimum(0.0)
+        self.stop_loss_input.setMaximum(999999.0)
+        self.stop_loss_input.setSingleStep(0.0001)
+        self.stop_loss_input.setValue(0.0)
+        self.stop_loss_input.setSpecialValueText("Stop Loss") 
+        self.stop_loss_input.setAlignment(Qt.AlignCenter)
+        self.stop_loss_input.setFixedHeight(26)
+        
+        # 🟢 FIX: Restored Up Arrow
+        sl_up = QPushButton("▲")
+        sl_up.setObjectName("StitchedBtnRight")
+        sl_up.setFixedSize(28, 26)
+        
+        sl_down.clicked.connect(lambda: self.stop_loss_input.setValue(max(0.0, self.stop_loss_input.value() - 0.0001)))
+        sl_up.clicked.connect(lambda: self.stop_loss_input.setValue(min(999999.0, self.stop_loss_input.value() + 0.0001)))
+        
+        sl_ctrl.addWidget(sl_down)
+        sl_ctrl.addWidget(self.stop_loss_input)
+        sl_ctrl.addWidget(sl_up)
 
-        row.addWidget(self.stop_loss_input)
-        row.addWidget(self.take_profit_input)
+        tp_ctrl = QHBoxLayout()
+        tp_ctrl.setSpacing(0)
+        
+        # 🟢 FIX: Restored Down Arrow
+        tp_down = QPushButton("▼")
+        tp_down.setObjectName("StitchedBtnLeft")
+        tp_down.setFixedSize(28, 26)
+        
+        self.take_profit_input = QDoubleSpinBox()
+        self.take_profit_input.setObjectName("StitchedInput")
+        self.take_profit_input.setDecimals(5)
+        self.take_profit_input.setMinimum(0.0)
+        self.take_profit_input.setMaximum(999999.0)
+        self.take_profit_input.setSingleStep(0.0001)
+        self.take_profit_input.setValue(0.0)
+        self.take_profit_input.setSpecialValueText("Take Profit")
+        self.take_profit_input.setAlignment(Qt.AlignCenter)
+        self.take_profit_input.setFixedHeight(26)
+        
+        # 🟢 FIX: Restored Up Arrow
+        tp_up = QPushButton("▲")
+        tp_up.setObjectName("StitchedBtnRight")
+        tp_up.setFixedSize(28, 26)
+        
+        tp_down.clicked.connect(lambda: self.take_profit_input.setValue(max(0.0, self.take_profit_input.value() - 0.0001)))
+        tp_up.clicked.connect(lambda: self.take_profit_input.setValue(min(999999.0, self.take_profit_input.value() + 0.0001)))
+        
+        tp_ctrl.addWidget(tp_down)
+        tp_ctrl.addWidget(self.take_profit_input)
+        tp_ctrl.addWidget(tp_up)
+
+        row.addLayout(sl_ctrl)
+        row.addLayout(tp_ctrl)
         return row
 
     def _create_buttons_row(self):
@@ -171,12 +318,12 @@ class MarketOrderForm(QWidget):
 
         self.sell_btn = QPushButton(f"{self.sell_price}\nSell")
         self.sell_btn.setFixedHeight(52)
-        self.sell_btn.setStyleSheet(BUTTON_STYLES['sell'])
+        self.sell_btn.setStyleSheet(BUTTON_STYLES['sell'] + " font-size: 13px; font-weight: bold;")
         self.sell_btn.clicked.connect(lambda: self._submit_order("SELL"))
 
         self.buy_btn = QPushButton(f"{self.buy_price}\nBuy")
         self.buy_btn.setFixedHeight(52)
-        self.buy_btn.setStyleSheet(BUTTON_STYLES['buy'])
+        self.buy_btn.setStyleSheet(BUTTON_STYLES['buy'] + " font-size: 13px; font-weight: bold;")
         self.buy_btn.clicked.connect(lambda: self._submit_order("BUY"))
 
         row.addWidget(self.sell_btn)
@@ -184,10 +331,10 @@ class MarketOrderForm(QWidget):
         return row
 
     def _create_remarks_section(self):
-        """Compact remarks text field — placeholder only, no label"""
+        """Compact remarks text field"""
         self.remarks_input = QTextEdit()
         self.remarks_input.setPlaceholderText("Remarks")
-        self.remarks_input.setFixedHeight(52)
+        self.remarks_input.setFixedHeight(48)
         return self.remarks_input
 
     def _create_info_row(self):
@@ -248,9 +395,9 @@ class MarketOrderForm(QWidget):
         order_data = {
             'symbol':         self.symbol,
             'type':           order_type,
-            'volume':         self.volume_control.get_volume(),
-            'stop_loss':      self.stop_loss_input.get_value() if self.stop_loss_input.get_text() else None,
-            'take_profit':    self.take_profit_input.get_value() if self.take_profit_input.get_text() else None,
+            'volume':         self.volume_input.value(),
+            'stop_loss':      self.stop_loss_input.value() if self.stop_loss_input.value() > 0 else None,
+            'take_profit':    self.take_profit_input.value() if self.take_profit_input.value() > 0 else None,
             'remarks':        self.remarks_input.toPlainText(),
             'order_category': 'market'
         }
