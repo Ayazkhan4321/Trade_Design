@@ -4,7 +4,8 @@ from accounts.store import AppStore
 import auth.session as session
 from api.config import API_CLIENT_MESSAGES_ACCOUNT, API_TIMEOUT, API_VERIFY_TLS
 
-from PySide6.QtWidgets import QWidget, QVBoxLayout, QTabBar, QStackedLayout, QHBoxLayout, QPushButton
+# 🟢 Ensure QFrame is imported
+from PySide6.QtWidgets import QWidget, QFrame, QVBoxLayout, QTabBar, QStackedLayout, QHBoxLayout, QPushButton
 from PySide6.QtCore import Qt, QTimer
 from .orders_tab import OrdersTab
 from .history_table import HistoryTable
@@ -21,6 +22,10 @@ class OrdersWidget(QWidget):
 
     def __init__(self, parent=None, order_service=None):
         super().__init__(parent)
+        
+        # 🟢 FIX: Force this widget to physically paint its background color
+        self.setAttribute(Qt.WA_StyledBackground, True) 
+        
         self.setWindowTitle("Order Desk")
         self.resize(1200, 700)
 
@@ -32,7 +37,7 @@ class OrdersWidget(QWidget):
 
         # ── Buttons — objectNames required so parent stylesheet rules match ──
         self.settings_btn = QPushButton("⚙")
-        self.settings_btn.setObjectName("OrdersSettingsBtn")   # FIX: was missing
+        self.settings_btn.setObjectName("OrdersSettingsBtn")
         self.settings_btn.setFixedSize(32, 32)
         try:
             self.settings_btn.setCursor(Qt.PointingHandCursor)
@@ -40,8 +45,21 @@ class OrdersWidget(QWidget):
             pass
 
         self.funnel_btn = QPushButton("⏷")
-        self.funnel_btn.setObjectName("OrdersFunnelBtn")       # FIX: was missing
+        self.funnel_btn.setObjectName("OrdersFunnelBtn")
         self.funnel_btn.setFixedSize(32, 32)
+        try:
+            self.funnel_btn.setCursor(Qt.PointingHandCursor)
+        except Exception:
+            pass
+
+        self.close_btn = QPushButton("✕")
+        self.close_btn.setObjectName("OrdersCloseBtn")
+        self.close_btn.setFixedSize(32, 32)
+        try:
+            self.close_btn.setCursor(Qt.PointingHandCursor)
+        except Exception:
+            pass
+        self.close_btn.clicked.connect(self._close_dock)
 
         # ── Tab bar ────────────────────────────────────────────────────────
         self.tabbar = QTabBar(self)
@@ -51,6 +69,9 @@ class OrdersWidget(QWidget):
         self.tabbar.addTab("Inbox")
         self.tabbar.addTab("Logs")
         self.tabbar.setExpanding(False)
+        self.tabbar.setDrawBase(False)
+        self.tabbar.setDocumentMode(True)
+        self.tabbar.setFixedHeight(32)
 
         self.setObjectName("OrdersWidget")
 
@@ -61,16 +82,41 @@ class OrdersWidget(QWidget):
         self.logs_tab    = QLabel("Logs Tab")
 
         self.stack = QStackedLayout()
+        # 🟢 THE FIX: Force the stacked layout to have 0 margins
+        self.stack.setContentsMargins(0, 0, 0, 0)
+        self.stack.setSpacing(0)
+        
         self.stack.addWidget(self.orders_tab)
         self.stack.addWidget(self.history_tab)
         self.stack.addWidget(self.inbox_tab)
         self.stack.addWidget(self.logs_tab)
 
+        # 🟢 THE FIX: Loop through the child tabs and obliterate their internal layout margins
+        for inner_tab in [self.orders_tab, self.history_tab, self.inbox_tab, self.logs_tab]:
+            if hasattr(inner_tab, 'layout') and inner_tab.layout() is not None:
+                inner_tab.layout().setContentsMargins(0, 0, 0, 0)
+                inner_tab.layout().setSpacing(0)
+            try:
+                inner_tab.setStyleSheet(inner_tab.styleSheet() + " background: transparent; border: none; margin: 0px; padding: 0px;")
+            except Exception:
+                inner_tab.setStyleSheet("background: transparent; border: none; margin: 0px; padding: 0px;")
+
         # ── Top row ────────────────────────────────────────────────────────
-        top_row = QHBoxLayout()
+        # 🟢 FIX: Use QFrame so background color renders correctly, stopping the bleeding!
+        self.top_container = QFrame()
+        self.top_container.setObjectName("OrdersTopContainer") 
+        self.top_container.setFixedHeight(32)
+        
+        # 🟢 Double enforce background painting
+        self.top_container.setAttribute(Qt.WA_StyledBackground, True)
+        self.top_container.setStyleSheet("background-color: #ffffff; border: none;")
+        
+        top_row = QHBoxLayout(self.top_container)
         top_row.setContentsMargins(0, 0, 0, 0)
         top_row.setSpacing(0)
-        top_row.addWidget(self.tabbar)
+        
+        # Snap directly to top-left
+        top_row.addWidget(self.tabbar, 0, Qt.AlignTop | Qt.AlignLeft)
 
         try:
             top_row.addStretch()
@@ -84,22 +130,18 @@ class OrdersWidget(QWidget):
 
         btns_layout = QHBoxLayout()
         btns_layout.setContentsMargins(6, 0, 6, 0)
+        btns_layout.setSpacing(2)
         btns_layout.addWidget(self.settings_btn)
         btns_layout.addWidget(self.funnel_btn)
-        top_row.addStretch()
+        btns_layout.addWidget(self.close_btn) 
+        
         top_row.addLayout(btns_layout)
-        main_layout.addLayout(top_row)
+        
+        main_layout.addWidget(self.top_container)
         main_layout.addLayout(self.stack)
 
-        # ── Initial theme paint ───────────────────────────────────────────
-        # FIX: was a one-shot inline block; now a proper method called here
-        # AND re-called on every theme_changed signal.
         self._apply_styles(self._get_tokens())
 
-        # ── Live theme updates ────────────────────────────────────────────
-        # FIX: OrdersWidget never connected to theme_changed — this is the
-        # root cause of the stale colour bug.  The lambda is stored as an
-        # instance attribute so PySide6 doesn't GC the connection.
         try:
             from Theme.theme_manager import ThemeManager
             self._on_theme_changed = lambda name, tokens: self._apply_styles(tokens)
@@ -107,7 +149,6 @@ class OrdersWidget(QWidget):
         except Exception:
             pass
 
-        # ── Tab signal ────────────────────────────────────────────────────
         try:
             self.tabbar.currentChanged.connect(
                 lambda idx: self.on_tab_changed(self.tabbar.tabText(idx))
@@ -115,7 +156,6 @@ class OrdersWidget(QWidget):
         except Exception:
             pass
 
-        # ── Order service ─────────────────────────────────────────────────
         try:
             if order_service is not None:
                 order_service.register_listener(self._on_order_created)
@@ -164,8 +204,20 @@ class OrdersWidget(QWidget):
             LOG.exception("Failed to connect to account signals")
 
     # ------------------------------------------------------------------ #
-    # Theme helpers                                                         #
+    # Methods
     # ------------------------------------------------------------------ #
+
+    def _close_dock(self):
+        try:
+            p = self.parent()
+            while p is not None:
+                from PySide6.QtWidgets import QDockWidget
+                if isinstance(p, QDockWidget):
+                    p.close()
+                    break
+                p = p.parent()
+        except Exception:
+            LOG.exception("Failed to close parent dock from OrdersWidget")
 
     def _get_tokens(self) -> dict:
         try:
@@ -175,16 +227,6 @@ class OrdersWidget(QWidget):
             return {}
 
     def _apply_styles(self, tokens: dict):
-        """Apply the full widget stylesheet from *tokens*.
-
-        Called at init AND on every theme_changed signal so the tab bar
-        and buttons always reflect the current accent colour.
-
-        All rules live in ONE self.setStyleSheet() call using objectName
-        selectors — resolved before the app stylesheet and applied
-        atomically (no cleared-then-reset race window).  Children must
-        carry no widget-level stylesheet of their own.
-        """
         t = tokens if tokens else {}
 
         bg_w   = t.get("bg_widget",        "#ffffff")
@@ -198,31 +240,49 @@ class OrdersWidget(QWidget):
 
         self.setStyleSheet(f"""
             QWidget#OrdersWidget {{
-                background: {bg_w};
+                background-color: {bg_w};
+                border: none;
+            }}
+            
+            /* 🟢 Update selector to QFrame */
+            QFrame#OrdersTopContainer {{
+                background-color: {bg_w};
+                border: none;
+                margin: 0px;
+                padding: 0px;
             }}
 
             QTabBar#OrdersTabBar {{
                 background: transparent;
                 padding: 0px;
+                margin: 0px;
+                border: none;
+                qproperty-drawBase: 0;
             }}
+            
             QTabBar#OrdersTabBar::tab {{
                 background: {tab_i};
                 border: none;
                 border-bottom: 3px solid transparent;
-                padding: 8px 16px;
-                margin-right: 0px;
+                padding: 0px 16px;
+                margin: 0px;
                 color: {col_i};
                 font-size: 12px;
                 font-weight: 600;
+                height: 32px; 
             }}
+            
             QTabBar#OrdersTabBar::tab:selected {{
                 background: {tab_a};
                 color: {col_a};
                 border-bottom: 3px solid {acc};
+                margin: 0px;
             }}
+            
             QTabBar#OrdersTabBar::tab:hover {{
                 background: {tab_h};
                 color: {text_p};
+                margin: 0px;
             }}
 
             QLabel#OrdersTitle {{
@@ -233,13 +293,15 @@ class OrdersWidget(QWidget):
             }}
 
             QPushButton#OrdersSettingsBtn,
-            QPushButton#OrdersFunnelBtn {{
+            QPushButton#OrdersFunnelBtn,
+            QPushButton#OrdersCloseBtn {{
                 background: transparent;
                 color: {text_p};
                 border: none;
                 font-family: "Segoe UI", "Inter", "Arial", sans-serif;
                 font-size: 16px;
                 padding: 0px;
+                margin: 0px;
             }}
             QPushButton#OrdersSettingsBtn:hover,
             QPushButton#OrdersFunnelBtn:hover {{
@@ -247,32 +309,43 @@ class OrdersWidget(QWidget):
                 color: {acc};
                 border-radius: 4px;
             }}
+            QPushButton#OrdersCloseBtn:hover {{
+                background: rgba(239, 68, 68, 0.15);
+                color: #ef4444; 
+                border-radius: 4px;
+            }}
             QPushButton#OrdersSettingsBtn:pressed,
-            QPushButton#OrdersFunnelBtn:pressed {{
+            QPushButton#OrdersFunnelBtn:pressed,
+            QPushButton#OrdersCloseBtn:pressed {{
                 background: {tab_a};
                 color: {acc};
                 border-radius: 4px;
             }}
+            
+            /* 🟢 EXTRA PROTECTION: Hide horizontal scrollbar tracks in the table so they don't look like widgets! */
+            QScrollBar:horizontal {{
+                background: transparent;
+                height: 4px;
+                border: none;
+            }}
+            QScrollBar::add-page:horizontal, QScrollBar::sub-page:horizontal {{
+                background: transparent;
+            }}
         """)
 
-        # Wipe any stale widget-level stylesheets on children so the
-        # parent's rules above are not shadowed.
+        self.top_container.setStyleSheet("")
         self.tabbar.setStyleSheet("")
         self.settings_btn.setStyleSheet("")
         self.funnel_btn.setStyleSheet("")
+        self.close_btn.setStyleSheet("")
 
     def closeEvent(self, event):
-        """Disconnect theme listener to avoid dangling reference."""
         try:
             from Theme.theme_manager import ThemeManager
             ThemeManager.instance().theme_changed.disconnect(self._on_theme_changed)
         except Exception:
             pass
         super().closeEvent(event)
-
-    # ------------------------------------------------------------------ #
-    # Tab / button logic (unchanged from original)                          #
-    # ------------------------------------------------------------------ #
 
     def switch_tab(self, index):
         try:

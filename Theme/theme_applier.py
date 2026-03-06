@@ -28,6 +28,19 @@ QMainWindow, QWidget {{
     font-size: 12px;
 }}
 
+/* 🟢 DOCK RESIZE HANDLE (The gap above the tabs) 🟢 */
+/* This reduces the space to 3px and makes it transparent normally */
+QMainWindow::separator {{
+    background: transparent;
+    height: 3px; 
+    width: 3px;
+    border: none;
+}}
+/* When you hover to drag, it lights up with your theme's accent color! */
+QMainWindow::separator:hover {{
+    background: {t['accent']}; 
+}}
+
 /* ---- Dock widgets ---- */
 QDockWidget {{
     background: {t['bg_panel']};

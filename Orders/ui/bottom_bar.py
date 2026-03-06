@@ -1,18 +1,19 @@
-from PySide6.QtWidgets import QWidget, QHBoxLayout, QLabel
+from PySide6.QtWidgets import QWidget, QHBoxLayout, QLabel, QHeaderView
 from PySide6.QtCore import Qt, QTimer
+from PySide6.QtGui import QResizeEvent
 
 from accounts.store import AppStore
 from decimal import Decimal, InvalidOperation
 
 
 class BottomBar(QWidget):
-    def __init__(self, table_view, profit_col):
+    def __init__(self, table_view, profit_col_index):
         super().__init__()
 
         self.table_view = table_view
-        self.profit_col = profit_col
+        self.profit_col_index = profit_col_index
 
-        self.setFixedHeight(40)
+        self.setFixedHeight(28)
         self.setObjectName("orders_bottom_bar")
 
         # 1. State variables
@@ -45,9 +46,10 @@ class BottomBar(QWidget):
         except Exception:
             self.setStyleSheet("#orders_bottom_bar { background: #F9FAFB; border-top: 1px solid #E5E7EB; }")
 
+        # --- Left side content container ---
         self.content = QWidget(self)
         content_layout = QHBoxLayout(self.content)
-        content_layout.setContentsMargins(10, 4, 10, 4)
+        content_layout.setContentsMargins(10, 0, 10, 0)
         content_layout.setSpacing(6)
 
         # 3. Create the Labels
@@ -72,25 +74,42 @@ class BottomBar(QWidget):
 
         content_layout.addStretch()
 
-        # 4. Right-side Net P&L (Floating container anchored to the far right)
-        self.net_pl = QLabel()
-        self.net_pl_container = QWidget(self)
-        self.net_pl_container.setFixedHeight(32)
-        net_layout = QHBoxLayout(self.net_pl_container)
-        net_layout.setContentsMargins(0, 0, 10, 0)
-        net_layout.setAlignment(Qt.AlignRight | Qt.AlignVCenter)
-        net_layout.addWidget(self.net_pl)
-        self.net_pl_container.show()
-        self.net_pl_container.raise_()
+        # 4. 🟢 FIX: Split into TWO floating containers for perfect alignment 🟢
+        
+        # --- TITLE CONTAINER (Net P&L:) ---
+        self.net_pl_title = QLabel()
+        self.net_pl_title.setAlignment(Qt.AlignRight | Qt.AlignVCenter)
+        self.net_pl_title_container = QWidget(self)
+        self.net_pl_title_container.setFixedHeight(self.height())
+        title_layout = QHBoxLayout(self.net_pl_title_container)
+        title_layout.setContentsMargins(0, 0, 8, 0) # 8px padding before the value
+        title_layout.addWidget(self.net_pl_title)
+        
+        # --- VALUE CONTAINER (-6.81) ---
+        self.net_pl_value = QLabel()
+        self.net_pl_value.setAlignment(Qt.AlignCenter) # Center exactly under the column!
+        self.net_pl_value_container = QWidget(self)
+        self.net_pl_value_container.setFixedHeight(self.height())
+        value_layout = QHBoxLayout(self.net_pl_value_container)
+        value_layout.setContentsMargins(0, 0, 0, 0)
+        value_layout.addWidget(self.net_pl_value)
+        
+        self.net_pl_title_container.show()
+        self.net_pl_title_container.raise_()
+        self.net_pl_value_container.show()
+        self.net_pl_value_container.raise_()
 
         # 5. Apply Initial Formatting
         self._refresh_all_labels()
 
-        try:
-            self.table_view.horizontalScrollBar().valueChanged.connect(self._on_table_hscroll)
-            QTimer.singleShot(0, self._initial_layout)
-        except Exception:
-            pass
+        # 6. Connect Signals for Alignment
+        header = self.table_view.horizontalHeader()
+        header.sectionResized.connect(self.align_net_pl)
+        header.sectionMoved.connect(self.align_net_pl)
+        self.table_view.horizontalScrollBar().valueChanged.connect(self._on_table_hscroll)
+
+        QTimer.singleShot(0, self._initial_layout)
+        QTimer.singleShot(10, self.align_net_pl)
 
         try:
             store = AppStore.instance()
@@ -103,13 +122,63 @@ class BottomBar(QWidget):
             pass
 
     # -------------------------------------------------------------------------
+    # 🟢 DYNAMIC ALIGNMENT LOGIC 🟢
+    # -------------------------------------------------------------------------
+    def align_net_pl(self, *args):
+        """
+        Calculates the exact position and width of the 'Profit/Loss' column
+        and places the Value exactly underneath it, with the Title just to its left.
+        """
+        try:
+            header = self.table_view.horizontalHeader()
+            
+            visual_index = header.visualIndex(self.profit_col_index)
+            viewport_x = header.sectionViewportPosition(visual_index)
+            col_width = header.sectionSize(visual_index)
+            v_header_width = self.table_view.verticalHeader().width() if self.table_view.verticalHeader().isVisible() else 0
+
+            final_x = viewport_x + v_header_width
+
+            # Place the VALUE exactly inside the column width
+            self.net_pl_value_container.setGeometry(final_x, 0, col_width, self.height())
+            
+            # Place the TITLE exactly to the left of the value container
+            title_w = 100 
+            self.net_pl_title_container.setGeometry(final_x - title_w, 0, title_w, self.height())
+            
+        except Exception:
+            pass
+
+    def resizeEvent(self, event: QResizeEvent):
+        super().resizeEvent(event)
+        try:
+            self.content.resize(max(self.width(), self.content.sizeHint().width()), self.height())
+            self.align_net_pl()
+        except Exception:
+            pass
+            
+    def _on_table_hscroll(self, value: int):
+        try:
+            self.content.move(-int(value), 0)
+        except Exception:
+            pass
+        self.align_net_pl()
+
+    def _initial_layout(self):
+        try:
+            self.content.setFixedHeight(self.height())
+            self.content.move(0, 0)
+            self.align_net_pl()
+        except Exception:
+            pass
+
+    # -------------------------------------------------------------------------
     # UI Formatting Helpers
     # -------------------------------------------------------------------------
     def _format_label(self, title: str, value: str, value_color: str = None) -> str:
         try:
             from Theme.theme_manager import ThemeManager
             tok = ThemeManager.instance().tokens()
-            # 🟢 FIX: Grab the actual 'accent' theme color for the names so they pop!
             color_title = tok.get("accent", "#1976d2") 
             if not value_color:
                 value_color = tok.get("text_primary", "#1F2937")
@@ -118,7 +187,6 @@ class BottomBar(QWidget):
             if not value_color:
                 value_color = "#1F2937"
             
-        # Added font-weight:600 to the title so the theme color stands out nicely
         return f"<span style='color:{color_title}; font-size:12px; font-weight:600;'>{title}:</span> &nbsp;<b style='color:{value_color}; font-size:12px;'>{value}</b>"
 
     def _refresh_all_labels(self):
@@ -143,20 +211,8 @@ class BottomBar(QWidget):
             pass
 
     # -------------------------------------------------------------------------
-    # Layout and Updating Methods
+    # 🟢 SPLIT DATA SETTING 🟢
     # -------------------------------------------------------------------------
-    def resizeEvent(self, event):
-        super().resizeEvent(event)
-        try:
-            w = 200
-            self.net_pl_container.setGeometry(self.width() - w, 4, w, 32)
-            self.content.resize(max(self.width(), self.content.sizeHint().width()), self.height())
-        except Exception:
-            pass
-
-    def align_net_pl(self):
-        pass
-
     def set_net_pl(self, value: float):
         try:
             self._val_net_pl = value
@@ -165,14 +221,17 @@ class BottomBar(QWidget):
             try:
                 from Theme.theme_manager import ThemeManager
                 tok = ThemeManager.instance().tokens()
-                # 🟢 FIX: Ensure Net P&L title also gets the accent color
                 title_color = tok.get("accent", "#1976d2") 
             except Exception:
                 title_color = "#1976d2"
                 
-            self.net_pl.setText(
-                f"<span style='color:{title_color}; font-size:13px; font-weight:600;'>Net P&L:</span> "
-                f"&nbsp;<b style='color:{color}; font-size:13px;'>{sign}{value:.2f}</b>"
+            # Set Title separately
+            self.net_pl_title.setText(
+                f"<span style='color:{title_color}; font-size:12px; font-weight:600;'>Net P&L:</span>"
+            )
+            # Set Value separately
+            self.net_pl_value.setText(
+                f"<b style='color:{color}; font-size:13px;'>{sign}{value:.2f}</b>"
             )
         except Exception:
             pass
@@ -217,22 +276,16 @@ class BottomBar(QWidget):
 
     def _apply_api_state(self, current_account: dict, api_response: dict):
         try:
-            if not api_response:
-                return
-
+            if not api_response: return
             acct_id = None
             if current_account and isinstance(current_account, dict):
                 acct_id = current_account.get('account_id') or current_account.get('accountId') or current_account.get('account_id')
-
             def find_in_list(lst):
                 for a in lst or []:
                     try:
-                        if acct_id is not None and int(a.get('accountId') or a.get('account_id') or 0) == int(acct_id):
-                            return a
-                    except Exception:
-                        continue
+                        if acct_id is not None and int(a.get('accountId') or a.get('account_id') or 0) == int(acct_id): return a
+                    except Exception: continue
                 return None
-
             candidate = None
             if isinstance(api_response, dict):
                 candidate = find_in_list(api_response.get('accounts', []))
@@ -240,30 +293,12 @@ class BottomBar(QWidget):
                     shared = api_response.get('sharedAccounts', [])
                     for group in shared or []:
                         candidate = find_in_list(group.get('accounts', []))
-                        if candidate:
-                            break
-
+                        if candidate: break
             if candidate:
                 try:
                     bal = candidate.get('balance')
                     cur = candidate.get('currency') or candidate.get('accountCurrency')
                     self.set_balance(bal)
-                    if cur:
-                        self.set_currency(cur)
-                except Exception:
-                    pass
-        except Exception:
-            pass
-
-    def _on_table_hscroll(self, value: int):
-        try:
-            self.content.move(-int(value), 0)
-        except Exception:
-            pass
-
-    def _initial_layout(self):
-        try:
-            self.content.setFixedHeight(self.height())
-            self.content.move(0, 0)
-        except Exception:
-            pass
+                    if cur: self.set_currency(cur)
+                except Exception: pass
+        except Exception: pass
