@@ -8,8 +8,8 @@ class SymbolTreeView(QTreeWidget):
     """Tree view for displaying categorized symbols with favorite toggle"""
 
     favoriteToggled = Signal(str, bool)
-    # Allow callers to disable hover-show behaviour (some hosts prefer no hover)
-    show_hover_favorite = True
+    # Changed to False to prevent hover logic from hiding the stars
+    show_hover_favorite = False
 
     def apply_theme(self):
         """Apply theme-aware styles to this tree view."""
@@ -250,7 +250,7 @@ class SymbolTreeView(QTreeWidget):
                     'is_favorite': is_favorite
                 })
 
-                # Create star button (initially hidden, shown on hover)
+                # Create star button (Initially visible now)
                 star_btn = QPushButton("★" if is_favorite else "☆")
                 star_btn.setFixedSize(20, 20)
                 star_btn.setStyleSheet(
@@ -262,7 +262,7 @@ class SymbolTreeView(QTreeWidget):
                 star_btn.clicked.connect(
                     lambda checked, name=symbol_name, item=symbol_item: self.toggle_favorite(name, item)
                 )
-                star_btn.hide()  # Initially hidden
+                # REMOVED: star_btn.hide() - Stars are now visible by default
 
                 # Store star button reference in item
                 symbol_item.setData(1, Qt.UserRole, star_btn)
@@ -318,50 +318,17 @@ class SymbolTreeView(QTreeWidget):
             item.setText(0, f"{arrow} {category_name} ({child_count})")
     
     def on_item_hovered(self, item, column):
-        """Show/hide star button on hover"""
+        """Show/hide star button on hover (Disabled to keep stars visible)"""
         if not getattr(self, 'show_hover_favorite', True):
             return
-        # Hide previous star button with safety check
-        if self.hovered_item is not None:
-            try:
-                # Check if item is still valid
-                prev_data = self.hovered_item.data(0, Qt.UserRole)
-                if prev_data and prev_data.get('type') == 'symbol':
-                    star_btn = self.hovered_item.data(1, Qt.UserRole)
-                    if star_btn:
-                        star_btn.hide()
-            except RuntimeError:
-                # Item was deleted, ignore
-                pass
-            finally:
-                self.hovered_item = None
-        
-        # Show current star button
-        try:
-            item_data = item.data(0, Qt.UserRole)
-            if item_data and item_data.get('type') == 'symbol':
-                star_btn = item.data(1, Qt.UserRole)
-                if star_btn:
-                    star_btn.show()
-                self.hovered_item = item
-        except RuntimeError:
-            # Item was deleted during processing
-            pass
+        # Original hover logic removed/bypassed
     
     def leaveEvent(self, event):
-        """Hide star button when mouse leaves"""
-        if self.hovered_item is not None:
-            try:
-                item_data = self.hovered_item.data(0, Qt.UserRole)
-                if item_data and item_data.get('type') == 'symbol':
-                    star_btn = self.hovered_item.data(1, Qt.UserRole)
-                    if star_btn:
-                        star_btn.hide()
-            except RuntimeError:
-                # Item was deleted, ignore
-                pass
-            finally:
-                self.hovered_item = None
+        """Hide star button when mouse leaves (Disabled to keep stars visible)"""
+        if not getattr(self, 'show_hover_favorite', True):
+            super().leaveEvent(event)
+            return
+        # Original hide-on-leave logic removed/bypassed
         super().leaveEvent(event)
     
     def toggle_favorite(self, symbol_name, item):

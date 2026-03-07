@@ -13,6 +13,36 @@ import auth.session as session
 LOG = logging.getLogger(__name__)
 
 
+# ── Helpers ───────────────────────────────────────────────────────────────
+def _detect_dark() -> bool:
+    from PySide6.QtGui import QColor
+    from PySide6.QtWidgets import QApplication
+    try:
+        from Theme.theme_manager import ThemeManager
+        tok = ThemeManager.instance().tokens()
+        val = tok.get("is_dark", None)
+        if val is not None:
+            if isinstance(val, bool): return val
+            s = str(val).lower()
+            if s in ("true", "1", "yes", "dark"):  return True
+            if s in ("false", "0", "no", "light"): return False
+        for key in ("bg_panel", "background", "bg_primary", "bg_base", "bg"):
+            cs = tok.get(key, None)
+            if cs:
+                c = QColor(cs)
+                if c.isValid():
+                    return c.lightness() < 128
+    except Exception:
+        pass
+    try:
+        app = QApplication.instance()
+        if app:
+            return app.palette().window().color().lightness() < 128
+    except Exception:
+        pass
+    return False
+
+
 class BulkCloseDialog(QDialog):
     """Simple modal to select multiple orders and POST to bulk-close endpoint."""
 
@@ -48,7 +78,7 @@ class BulkCloseDialog(QDialog):
         header_layout.setContentsMargins(16, 12, 16, 12)
         
         icon = QLabel("\U0001F4E6")
-        icon.setStyleSheet("font-size: 20px; background: transparent;")
+        icon.setStyleSheet("font-size: 20px; background: transparent; color: inherit;")
         icon.setFixedWidth(28)
         
         text_col = QVBoxLayout()
@@ -72,6 +102,13 @@ class BulkCloseDialog(QDialog):
         header_layout.addWidget(self.btn_x_close)
         
         layout.addWidget(self.header_widget)
+
+        # Separator line below header
+        header_sep = QFrame(self.main_container)
+        header_sep.setFrameShape(QFrame.HLine)
+        header_sep.setFixedHeight(1)
+        header_sep.setObjectName("HeaderSep")
+        layout.addWidget(header_sep)
 
         content_layout = QVBoxLayout()
         content_layout.setContentsMargins(16, 12, 16, 0)
@@ -213,28 +250,26 @@ class BulkCloseDialog(QDialog):
         super().mouseReleaseEvent(event)
 
     def _apply_theme(self):
+        dark = _detect_dark()
         try:
             from Theme.theme_manager import ThemeManager
-            tok = ThemeManager.instance().tokens()
-            bg_panel = tok.get("bg_panel", "#ffffff")
-            text_pri = tok.get("text_primary", "#1a202c")
-            text_sec = tok.get("text_secondary", "#4a5568")
-            border = tok.get("border_primary", "#e5e7eb")
-            bg_input = tok.get("bg_input", "#f5f7fa")
-            accent = tok.get("accent", "#1976d2")
-            is_dark = tok.get("is_dark", "false") == "true"
-            
-            acc_t = "#ffffff" if is_dark else tok.get("accent_text", "#ffffff")
-            if "crazy" in ThemeManager.instance().current_theme or not is_dark:
-                acc_t = "#ffffff"
+            tok    = ThemeManager.instance().tokens()
+            accent = tok.get("accent", "#2563eb")
         except Exception:
-            bg_panel, text_pri, text_sec, border, accent, bg_input, acc_t, is_dark = (
-                "#ffffff", "#1a202c", "#4a5568", "#e5e7eb", "#1976d2", "#f5f7fa", "#ffffff", False
-            )
+            accent = "#2563eb"
 
-        if is_dark:
-            if border == "#e5e7eb": border = "#374151"
-            if bg_input == "#f5f7fa": bg_input = "#1f2937"
+        if dark:
+            bg_panel = "#151e2d"
+            text_pri = "#e2e8f0"
+            text_sec = "#94a3b8"
+            border   = "#2d3a4a"
+            bg_input = "#1e2a3a"
+        else:
+            bg_panel = "#ffffff"
+            text_pri = "#111827"
+            text_sec = "#6b7280"
+            border   = "#e2e8f0"
+            bg_input = "#f9fafb"
 
         self.setStyleSheet(f"""
             QDialog {{
@@ -246,39 +281,43 @@ class BulkCloseDialog(QDialog):
                 border-radius: 8px;
             }}
             QWidget#HeaderWidget {{
-                background-color: {accent};
+                background-color: transparent;
                 border-top-left-radius: 6px;
                 border-top-right-radius: 6px;
             }}
             QLabel#HeaderTitle {{
-                color: {acc_t};
+                color: {text_pri};
                 font-size: 16px;
                 font-weight: 700;
                 background: transparent;
             }}
             QLabel#HeaderSubtitle {{
-                color: {acc_t};
+                color: {text_sec};
                 font-size: 12px;
                 background: transparent;
-                opacity: 0.85;
             }}
             QPushButton#HeaderCloseBtn {{
-                background-color: rgba(255,255,255,0.22);
-                border: 2px solid #ffffff;
+                background-color: transparent;
+                border: 1px solid {border};
                 border-radius: 5px;
-                color: #ffffff;
-                font-family: "Segoe UI Symbol", Arial, sans-serif;
-                font-size: 14px; 
+                color: {text_pri};
+                font-size: 14px;
                 font-weight: 900;
-                padding: 0px;
-                margin: 0px;
+                padding: 0px; margin: 0px;
             }}
             QPushButton#HeaderCloseBtn:hover {{
                 background-color: rgba(210,40,40,0.88);
-                border-color: #ffffff;
+                border-color: #cc3333;
+                color: #ffffff;
+            }}
+            QFrame#HeaderSep {{
+                background-color: {border};
+                border: none;
+                max-height: 1px;
             }}
             QLabel {{
                 color: {text_pri};
+                background: transparent;
             }}
             QWidget#FilterBox {{
                 background-color: {bg_input};
@@ -292,19 +331,17 @@ class BulkCloseDialog(QDialog):
                 border-radius: 4px;
                 padding: 4px;
             }}
-            
-            /* 🟢 FIX: Added right-padding so the text NEVER overlaps with the up/down arrows! */
             QDoubleSpinBox {{
                 background-color: {bg_panel};
                 color: {text_pri};
                 border: 1px solid {border};
                 border-radius: 4px;
-                padding: 4px 24px 4px 8px; 
+                padding: 4px 24px 4px 8px;
                 min-height: 22px;
             }}
-            
             QCheckBox {{
                 color: {text_pri};
+                background: transparent;
             }}
             QTableView#BulkTable {{
                 background-color: {bg_panel};
@@ -324,7 +361,7 @@ class BulkCloseDialog(QDialog):
             }}
             QPushButton#ActionBtn {{
                 background-color: {accent};
-                color: {acc_t};
+                color: #ffffff;
                 border: none;
                 border-radius: 6px;
                 font-weight: bold;
@@ -332,7 +369,11 @@ class BulkCloseDialog(QDialog):
             }}
             QPushButton#ActionBtn:hover {{
                 background-color: {accent};
-                opacity: 0.85;
+                opacity: 0.9;
+            }}
+            QPushButton#ActionBtn:disabled {{
+                background-color: {accent};
+                color: rgba(255,255,255,0.6);
             }}
         """)
 
