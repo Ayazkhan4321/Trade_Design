@@ -5,6 +5,7 @@ from PySide6.QtWidgets import (
     QVBoxLayout,
     QHeaderView,
     QMenu,
+    QScrollBar # 🟢 Imported explicitly
 )
 from PySide6.QtCore import Qt, QTimer, QEvent
 from PySide6.QtGui import QCursor, QAction
@@ -26,7 +27,6 @@ class OrderTable(QWidget):
         # -----------------------------
         self.table_view = QTableView(self)
         self.model = OrderModel()
-        # attach service reference to model and keep locally
         try:
             self.model.order_service = order_service
         except Exception:
@@ -40,15 +40,12 @@ class OrderTable(QWidget):
         self.table_view.setSelectionMode(QTableView.SingleSelection)
         self.table_view.setAlternatingRowColors(True)
 
-        # Track mouse moves so we can clear selection when the cursor
-        # moves away from a selected row (user expectation).
         try:
             self.table_view.setMouseTracking(True)
             self.table_view.installEventFilter(self)
         except Exception:
             pass
 
-        # Disable inline editing via the view (double-click / enter won't start editors)
         try:
             self.table_view.setEditTriggers(QTableView.NoEditTriggers)
         except Exception:
@@ -59,18 +56,26 @@ class OrderTable(QWidget):
             from Theme.theme_manager import ThemeManager
             t = ThemeManager.instance().tokens()
             self.table_view.setFocusPolicy(Qt.NoFocus)
+            
+            # 🟢 FIX: Use a soft light background (bg_tab_active) instead of the heavy dark block
+            # And use the primary text color so it remains perfectly readable!
+            light_select_bg = t.get('bg_tab_active', '#e6f0ff')
+            text_color = t.get('text_primary', '#1a202c')
+            
             self.table_view.setStyleSheet(
-                f"QTableView::item:hover {{ background: {t['bg_row_hover']}; }}"
+                f"QTableView::item:hover {{ background: {t.get('bg_row_hover', 'transparent')}; }}"
                 f"QTableView::item:focus {{ outline: none; }}"
-                f"QTableView::item:selected {{ background: {t['bg_selected']}; color: {t['text_selected']}; }}"
+                f"QTableView::item:selected {{ background: {light_select_bg}; color: {text_color}; }}"
             )
             # Re-apply on theme change
             def _on_theme_changed_order_table(name, tok, tv=self.table_view):
                 try:
+                    l_bg = tok.get('bg_tab_active', '#e6f0ff')
+                    t_col = tok.get('text_primary', '#1a202c')
                     tv.setStyleSheet(
-                        f"QTableView::item:hover {{ background: {tok['bg_row_hover']}; }}"
+                        f"QTableView::item:hover {{ background: {tok.get('bg_row_hover', 'transparent')}; }}"
                         f"QTableView::item:focus {{ outline: none; }}"
-                        f"QTableView::item:selected {{ background: {tok['bg_selected']}; color: {tok['text_selected']}; }}"
+                        f"QTableView::item:selected {{ background: {l_bg}; color: {t_col}; }}"
                     )
                 except RuntimeError:
                     # Widget was deleted, ignore
@@ -81,62 +86,56 @@ class OrderTable(QWidget):
             self.table_view.setStyleSheet(
                 "QTableView::item:hover { background: transparent; }"
                 "QTableView::item:focus { outline: none; }"
-                "QTableView::item:selected { background: #0b66a6; color: #fff; }"
+                "QTableView::item:selected { background: #e6f0ff; color: #1a202c; }"
             )
 
         self.table_view.verticalHeader().setVisible(False)
-        # allow scrolling when rows exceed visible area
         self.table_view.setVerticalScrollBarPolicy(Qt.ScrollBarAsNeeded)
 
-        # let the table expand and be scrollable inside the container
-        self.table_view.setSizePolicy(
-            QSizePolicy.Expanding,
-            QSizePolicy.Expanding
-        )
-
         # -----------------------------
-        # Header configuration (🔥 FIX)
+        # Header configuration
         # -----------------------------
         header = self.table_view.horizontalHeader()
+        headers = self.model.headers
 
-        # ❌ DO NOT stretch last section
-        # header.setStretchLastSection(True)  <-- REMOVED
-
-        # 🟢 FIX: Set to ResizeToContents so it perfectly hugs the text and removes wasted space!
-        header.setSectionResizeMode(QHeaderView.ResizeToContents)
-        header.setMinimumSectionSize(40)
+        header.setSectionResizeMode(QHeaderView.Interactive)
+        header.setDefaultSectionSize(95)
+        header.setMinimumSectionSize(50)
         header.setDefaultAlignment(Qt.AlignCenter)
         header.setFixedHeight(28)
+
+        for i, col_name in enumerate(headers):
+            name_upper = col_name.upper()
+            if "TIME" in name_upper:
+                self.table_view.setColumnWidth(i, 160)
+            elif "ID" in name_upper:
+                self.table_view.setColumnWidth(i, 60)
+            elif name_upper in ["TYPE", "LOT SIZE", "LOT", "S/L", "T/P", "SWAP", "COMMISSION"]:
+                self.table_view.setColumnWidth(i, 75)
+            elif "SYMBOL" in name_upper:
+                self.table_view.setColumnWidth(i, 80)
+            else:
+                self.table_view.setColumnWidth(i, 95)
 
         # -----------------------------
         # Delegates (Actions + Remarks)
         # -----------------------------
-        headers = self.model.headers
-
-        # Robustly find the Actions and Remarks columns. The header text may
-        # have been altered elsewhere (e.g. "Options ⋮"). Fall back to the
-        # expected last-two-column positions if names are not found.
         def _find_index(candidates, fallback_index):
             for c in candidates:
                 try:
                     return headers.index(c)
                 except ValueError:
                     continue
-            # fallback by index relative to end
             if fallback_index < 0:
                 idx = len(headers) + fallback_index
                 if 0 <= idx < len(headers):
                     return idx
-            # final fallback: 0
             return 0
 
         action_col = _find_index(["Actions", "Options ⋮", "Options", "⋮"], -2)
         remark_col = _find_index(["Remarks", "Remark"], -1)
 
-        # Ensure the header label remains 'Actions' while the header click
-        # will present an 'Options' menu for additional actions.
         try:
-            # Show three-dot affordance next to label
             self.model.headers[action_col] = "Actions  ⋮"
             try:
                 header.repaint()
@@ -155,58 +154,65 @@ class OrderTable(QWidget):
             RemarkDelegate(self.table_view)
         )
 
-        # Icon columns → fixed width
         header.setSectionResizeMode(action_col, QHeaderView.Fixed)
         header.setSectionResizeMode(remark_col, QHeaderView.Fixed)
-
-        # 🟢 FIX: Increased column widths from 50 to 90 so the full header words are perfectly visible!
         self.table_view.setColumnWidth(action_col, 90)
         self.table_view.setColumnWidth(remark_col, 80)
 
         # -----------------------------
-        # Important column widths
-        # -----------------------------
-        # 🟢 FIX: Removed the massive hardcoded column widths (`set_width("Market Price", 120)` etc).
-        # ResizeToContents handles everything cleanly automatically now.
-
-        # -----------------------------
         # Bottom bar (column-aware)
         # -----------------------------
-        headers = self.model.headers
-        # expose profit column index for alignment
         self.profit_col = headers.index("PROFIT/LOSS")
         self.bottom_bar = BottomBar(self.table_view, self.profit_col)
 
         # -----------------------------
-        # Layout: table + bottom bar
+        # Layout: table + bottom bar + custom scrollbar
         # -----------------------------
+        
+        self.h_scrollbar = QScrollBar(Qt.Horizontal, self)
+        
+        # Brutally disable the table's native scrollbar so they don't fight
+        self.table_view.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
+        
+        # Sync the new external scrollbar with the internal logic
+        internal_bar = self.table_view.horizontalScrollBar()
+        internal_bar.rangeChanged.connect(self.h_scrollbar.setRange)
+        internal_bar.valueChanged.connect(self.h_scrollbar.setValue)
+        self.h_scrollbar.valueChanged.connect(internal_bar.setValue)
+
+        # Hide our custom scrollbar automatically if no scrolling is needed
+        def _sync_visibility(min_val, max_val):
+            self.h_scrollbar.setVisible(max_val > 0)
+        internal_bar.rangeChanged.connect(_sync_visibility)
+
         layout = QVBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)
         layout.setSpacing(0)
-        layout.addWidget(self.table_view)
-        layout.addWidget(self.bottom_bar)
+        
+        # 🟢 FIX: We DO NOT use alignTop here anymore so the stretch works!
 
-        # let the OrderTable expand to fill available dock space (table scrolls)
+        # 🟢 FIX: The perfect stacking order with an invisible spring.
+        layout.addWidget(self.table_view)     # 1. Table
+        layout.addWidget(self.bottom_bar)     # 2. Bottom Bar (Slimmer now)
+        layout.addStretch(1)                  # 🟢 3. The Spring: Pushes slider all the way down!
+        layout.addWidget(self.h_scrollbar)    # 4. Slider rests at the absolute bottom
+
         self.setSizePolicy(
             QSizePolicy.Expanding,
             QSizePolicy.Expanding
         )
-        # NOTE: removed auto-resize logic so the table remains scrollable and
-        # the bottom bar stays fixed. The table's scrollbar will appear as needed.
 
-        # Make header sections clickable and handle clicks on the Options header
+        # Header Click connections
         try:
             header.setSectionsClickable(True)
             def _on_header_clicked(section):
                 try:
                     if section != action_col:
                         return
-                    # Instead of a plain menu, open the Bulk Close dialog
                     try:
                         dlg = BulkCloseDialog(self, order_service=getattr(self.model, 'order_service', None), model=self.model)
                         dlg.exec()
                     except Exception:
-                        # Fallback: show a simple options menu
                         menu = QMenu(self)
                         a1 = QAction("Options", self)
                         menu.addAction(a1)
@@ -218,10 +224,52 @@ class OrderTable(QWidget):
             header.sectionClicked.connect(_on_header_clicked)
         except Exception:
             pass
+            
+        try:
+            self.model.rowsInserted.connect(lambda p, f, l: self._update_table_height())
+            self.model.rowsRemoved.connect(lambda p, f, l: self._update_table_height())
+            self.model.modelReset.connect(self._update_table_height)
+            self.model.layoutChanged.connect(self._update_table_height)
+        except Exception:
+            pass
+            
+        QTimer.singleShot(0, self._update_table_height)
+
+    # -----------------------------
+    # 🟢 DYNAMIC HEIGHT CALCULATION 
+    # -----------------------------
+    def resizeEvent(self, event):
+        super().resizeEvent(event)
+        self._update_table_height()
+
+    def _update_table_height(self):
+        """Forces the table view height to perfectly match the number of rows, 
+        snapping the bottom bar directly underneath them."""
+        try:
+            header_h = self.table_view.horizontalHeader().height()
+            rows_h = self.table_view.verticalHeader().length()
+            frame_w = self.table_view.frameWidth() * 2
+            
+            content_h = header_h + rows_h + frame_w
+            
+            if self.model.rowCount() == 0:
+                content_h = header_h + frame_w
+                
+            # Detect height of external scrollbar if it's currently showing
+            scroll_h = self.h_scrollbar.height() if self.h_scrollbar.isVisible() else 0
+            available_h = self.height() - self.bottom_bar.height() - scroll_h
+            
+            if available_h <= 0:
+                available_h = 200 
+
+            final_h = min(content_h, available_h)
+            final_h = max(final_h, header_h + frame_w) 
+            
+            self.table_view.setFixedHeight(final_h)
+        except Exception:
+            pass
 
     def eventFilter(self, obj, event):
-        # Handle mouse leaving the table or moving to an empty area to
-        # clear any existing selection so rows don't remain selected.
         try:
             if obj is self.table_view:
                 if event.type() == QEvent.Leave:
@@ -232,7 +280,6 @@ class OrderTable(QWidget):
                     return False
 
                 if event.type() == QEvent.MouseMove:
-                    # If mouse is over no valid index, clear selection
                     pos = event.pos()
                     idx = self.table_view.indexAt(pos)
                     if not idx.isValid():

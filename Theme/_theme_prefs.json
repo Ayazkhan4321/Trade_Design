@@ -1,5 +1,10 @@
 {
   "theme": "dark",
   "crazy_color": "green",
-  "time_period_overrides": {}
+  "time_period_overrides": {
+    "morning": "dark",
+    "night": "light",
+    "evening": "crazy_purple",
+    "afternoon": "light"
+  }
 }
