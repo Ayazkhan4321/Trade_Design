@@ -7,7 +7,7 @@ from Login.login_page import LoginPage
 from Forgot_password.forgot_password_controller import ForgotPasswordDialog
 import auth.session as session
 import logging
-
+from plugins.tradingview_plugin import TradingChartPlugin
 # --- Theme system ---
 try:
     from Theme.theme_manager import ThemeManager
@@ -202,6 +202,8 @@ class MainWindow(QMainWindow):
                     self.ui.actionOpen_an_Account.setEnabled(False)
                 except Exception:
                     pass
+        self.chart_widget = TradingChartPlugin()
+        self.setCentralWidget(self.chart_widget)
 
     def _setup_theme_toolbar_button(self):
         """
