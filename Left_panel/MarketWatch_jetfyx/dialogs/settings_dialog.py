@@ -276,7 +276,43 @@ class SettingsDialog(QDialog):
         row_layout.addWidget(self.up_arrow_btn)
         row_layout.addWidget(self.edit_btn)
         row_layout.addWidget(self.default_lot_toggle)
+        # 1. Connect the arrow buttons
+        self.down_arrow_btn.clicked.connect(lambda: self._adjust_lot(-0.01))
+        self.up_arrow_btn.clicked.connect(lambda: self._adjust_lot(0.01))
+        
+        # 2. Setup the edit/input behavior
+        self.default_lot_input.setReadOnly(True) # Start as read-only
+        self.edit_btn.setCheckable(True)
+        self.edit_btn.clicked.connect(self._toggle_edit_mode)
+        
+        # 3. Connect the toggle and input changes to emit signals
+        self.default_lot_toggle.toggled.connect(self._on_setting_changed)
         return container
+    def _adjust_lot(self, delta: float):
+        """Increments or decrements the lot value."""
+        try:
+            current_val = float(self.default_lot_input.text())
+            new_val = max(0.01, current_val + delta) # Ensure lot isn't negative
+            self.default_lot_input.setText(f"{new_val:.2f}")
+        except ValueError:
+            self.default_lot_input.setText("0.01")
+    
+    def _toggle_edit_mode(self):
+        """Toggles editability and swaps the icon between Pencil and Checkmark."""
+        is_editing = self.edit_btn.isChecked()
+        self.default_lot_input.setReadOnly(not is_editing)
+        
+        if is_editing:
+            # Switch to Checkmark (Tick) symbol
+            self.edit_btn.setText("✓") 
+            self.default_lot_input.setFocus()
+            self.default_lot_input.selectAll()
+        else:
+            # Switch back to Pencil symbol
+            self.edit_btn.setText("✏")
+            self.default_lot_input.clearFocus()
+            # Ensure the value is saved/emitted when finishing edit
+            self._on_setting_changed()
 
     def _on_lot_value_changed(self):
         if not hasattr(self, 'edit_btn') or not self.edit_btn.isChecked():
