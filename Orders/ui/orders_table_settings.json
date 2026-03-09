@@ -2,7 +2,7 @@
   "Entry Value": true,
   "Commission": true,
   "Market Value": true,
-  "Swap": true,
+  "Swap": false,
   "P/L in %": true,
   "Remarks": true,
   "Multi-Target SL/TP": false
