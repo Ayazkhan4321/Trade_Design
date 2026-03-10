@@ -13,6 +13,36 @@ import auth.session as session
 LOG = logging.getLogger(__name__)
 
 
+# ── Delegates ─────────────────────────────────────────────────────────────
+from PySide6.QtWidgets import QStyledItemDelegate
+
+class _ReadOnlyCheckDelegate(QStyledItemDelegate):
+    """Draws the checkbox normally but swallows all mouse/key interaction."""
+    def editorEvent(self, event, model, option, index):
+        return False  # Block every interaction — checkbox is display-only
+
+    def initStyleOption(self, option, index):
+        super().initStyleOption(option, index)
+
+    def paint(self, painter, option, index):
+        super().paint(painter, option, index)
+
+
+class _ForbiddenCursorTable(QTableView):
+    """QTableView that shows a forbidden cursor when hovering over column 0."""
+    def mouseMoveEvent(self, event):
+        idx = self.indexAt(event.pos())
+        if idx.isValid() and idx.column() == 0:
+            self.setCursor(Qt.ForbiddenCursor)
+        else:
+            self.unsetCursor()
+        super().mouseMoveEvent(event)
+
+    def leaveEvent(self, event):
+        self.unsetCursor()
+        super().leaveEvent(event)
+
+
 # ── Helpers ───────────────────────────────────────────────────────────────
 def _detect_dark() -> bool:
     from PySide6.QtGui import QColor
@@ -180,7 +210,8 @@ class BulkCloseDialog(QDialog):
         content_layout.addLayout(info_row)
 
         # Table view
-        self.view = QTableView(self)
+        self.view = _ForbiddenCursorTable(self)
+        self.view.setMouseTracking(True)
         self.view.setObjectName("BulkTable")
         self.view.setSelectionBehavior(QTableView.SelectRows)
         self.view.setSelectionMode(QTableView.NoSelection)
@@ -204,6 +235,9 @@ class BulkCloseDialog(QDialog):
         header.setSectionResizeMode(6, QHeaderView.ResizeToContents) # SL
         header.setSectionResizeMode(7, QHeaderView.ResizeToContents) # TP
         header.setSectionResizeMode(8, QHeaderView.Stretch)          # Profit/Loss
+
+        # Make per-row checkboxes display-only (not user-clickable)
+        self.view.setItemDelegateForColumn(0, _ReadOnlyCheckDelegate(self.view))
 
         content_layout.addWidget(self.view, 1)
 
@@ -251,25 +285,42 @@ class BulkCloseDialog(QDialog):
 
     def _apply_theme(self):
         dark = _detect_dark()
+
+        # ── Pull every colour from ThemeManager tokens; fall back gracefully ──
         try:
             from Theme.theme_manager import ThemeManager
-            tok    = ThemeManager.instance().tokens()
-            accent = tok.get("accent", "#2563eb")
+            tok = ThemeManager.instance().tokens()
         except Exception:
-            accent = "#2563eb"
+            tok = {}
 
-        if dark:
-            bg_panel = "#151e2d"
-            text_pri = "#e2e8f0"
-            text_sec = "#94a3b8"
-            border   = "#2d3a4a"
-            bg_input = "#1e2a3a"
-        else:
-            bg_panel = "#ffffff"
-            text_pri = "#111827"
-            text_sec = "#6b7280"
-            border   = "#e2e8f0"
-            bg_input = "#f9fafb"
+        def _t(*keys, fallback_dark, fallback_light):
+            for k in keys:
+                v = tok.get(k)
+                if v:
+                    return v
+            return fallback_dark if dark else fallback_light
+
+        bg_panel  = _t("bg_panel",   "background",    "bg_primary", "bg_base", "bg",
+                        fallback_dark="#151e2d", fallback_light="#ffffff")
+        bg_input  = _t("bg_input",   "bg_secondary",  "bg_surface", "surface",
+                        fallback_dark="#1e2a3a", fallback_light="#f9fafb")
+        bg_hover  = _t("bg_hover",   "bg_row_hover",
+                        fallback_dark="#1e2d3d", fallback_light="#f0f4f8")
+        bg_select = _t("bg_selected","bg_row_selected","selection_bg",
+                        fallback_dark="#1a3a5c", fallback_light="#dbeafe")
+        text_pri  = _t("text_primary","text",          "fg",         "foreground",
+                        fallback_dark="#e2e8f0", fallback_light="#111827")
+        text_sec  = _t("text_secondary","text_muted",  "fg_muted",
+                        fallback_dark="#94a3b8", fallback_light="#6b7280")
+        text_sel  = _t("text_selected","selection_text",
+                        fallback_dark="#ffffff",  fallback_light="#1e40af")
+        border    = _t("border",      "border_color",  "divider",
+                        fallback_dark="#2d3a4a",  fallback_light="#e2e8f0")
+        accent    = _t("accent",      "primary",       "color_accent",
+                        fallback_dark="#3b82f6",  fallback_light="#2563eb")
+        scrollbar_bg    = _t("scrollbar_bg",    fallback_dark="#1e2a3a", fallback_light="#f1f5f9")
+        scrollbar_thumb = _t("scrollbar_thumb", fallback_dark="#3d4f63", fallback_light="#cbd5e1")
+        combo_drop_bg   = _t("dropdown_bg", "bg_dropdown", fallback_dark="#1e2a3a", fallback_light="#ffffff")
 
         self.setStyleSheet(f"""
             QDialog {{
@@ -325,19 +376,39 @@ class BulkCloseDialog(QDialog):
                 border-radius: 6px;
             }}
             QComboBox {{
-                background-color: {bg_panel};
+                background-color: {bg_input};
                 color: {text_pri};
                 border: 1px solid {border};
                 border-radius: 4px;
-                padding: 4px;
+                padding: 4px 8px;
+                selection-background-color: {accent};
+                selection-color: #ffffff;
+            }}
+            QComboBox:hover {{
+                border-color: {accent};
+            }}
+            QComboBox::drop-down {{
+                border: none;
+                padding-right: 4px;
+            }}
+            QComboBox QAbstractItemView {{
+                background-color: {combo_drop_bg};
+                color: {text_pri};
+                border: 1px solid {border};
+                selection-background-color: {accent};
+                selection-color: #ffffff;
+                outline: none;
             }}
             QDoubleSpinBox {{
-                background-color: {bg_panel};
+                background-color: {bg_input};
                 color: {text_pri};
                 border: 1px solid {border};
                 border-radius: 4px;
                 padding: 4px 24px 4px 8px;
                 min-height: 22px;
+            }}
+            QDoubleSpinBox:hover {{
+                border-color: {accent};
             }}
             QCheckBox {{
                 color: {text_pri};
@@ -349,6 +420,19 @@ class BulkCloseDialog(QDialog):
                 border: 1px solid {border};
                 gridline-color: {border};
                 border-radius: 4px;
+                outline: none;
+            }}
+            QTableView#BulkTable::item {{
+                color: {text_pri};
+                background-color: {bg_panel};
+                padding: 2px 4px;
+            }}
+            QTableView#BulkTable::item:hover {{
+                background-color: {bg_hover};
+            }}
+            QTableView#BulkTable::item:selected {{
+                background-color: {bg_select};
+                color: {text_sel};
             }}
             QHeaderView::section {{
                 background-color: {bg_input};
@@ -359,8 +443,41 @@ class BulkCloseDialog(QDialog):
                 padding: 6px;
                 font-weight: bold;
             }}
+            QScrollBar:vertical {{
+                background: {scrollbar_bg};
+                width: 8px;
+                border-radius: 4px;
+                margin: 0px;
+            }}
+            QScrollBar::handle:vertical {{
+                background: {scrollbar_thumb};
+                border-radius: 4px;
+                min-height: 20px;
+            }}
+            QScrollBar::handle:vertical:hover {{
+                background: {accent};
+            }}
+            QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical {{
+                height: 0px;
+            }}
+            QScrollBar:horizontal {{
+                background: {scrollbar_bg};
+                height: 8px;
+                border-radius: 4px;
+            }}
+            QScrollBar::handle:horizontal {{
+                background: {scrollbar_thumb};
+                border-radius: 4px;
+                min-width: 20px;
+            }}
+            QScrollBar::handle:horizontal:hover {{
+                background: {accent};
+            }}
+            QScrollBar::add-line:horizontal, QScrollBar::sub-line:horizontal {{
+                width: 0px;
+            }}
             QPushButton#ActionBtn {{
-                background-color: {accent};
+                background-color: #2e7d32;
                 color: #ffffff;
                 border: none;
                 border-radius: 6px;
@@ -368,12 +485,11 @@ class BulkCloseDialog(QDialog):
                 font-size: 14px;
             }}
             QPushButton#ActionBtn:hover {{
-                background-color: {accent};
-                opacity: 0.9;
+                background-color: #388e3c;
             }}
             QPushButton#ActionBtn:disabled {{
-                background-color: {accent};
-                color: rgba(255,255,255,0.6);
+                background-color: #2e7d32;
+                color: #ffffff;
             }}
         """)
 
@@ -458,6 +574,20 @@ class BulkCloseDialog(QDialog):
                 pass
         return ids
 
+    def _all_visible_order_ids(self):
+        """Return IDs of all rows currently visible (not filtered out)."""
+        ids = []
+        for r in range(self.table_model.rowCount()):
+            try:
+                if self.view.isRowHidden(r):
+                    continue
+                id_item = self.table_model.item(r, 2)
+                if id_item is not None:
+                    ids.append(id_item.text())
+            except Exception:
+                pass
+        return ids
+
     def _on_select_all(self, state):
         checked = state == Qt.Checked
         for r in range(self.table_model.rowCount()):
@@ -538,12 +668,15 @@ class BulkCloseDialog(QDialog):
             
         try:
             self.close_btn.setText(btn_text)
-            self.close_btn.setEnabled(selected > 0)
+            self.close_btn.setEnabled(total > 0)   # enabled whenever any orders exist
         except Exception:
             pass
 
     def _on_close(self):
         ids = self._selected_order_ids()
+        # If nothing manually selected via select-all, close all visible orders
+        if not ids:
+            ids = self._all_visible_order_ids()
         if not ids:
             LOG.info("No orders selected for bulk close")
             return
