@@ -3,7 +3,7 @@ from PySide6.QtWidgets import (
     QScrollBar, QSizePolicy
 )
 from PySide6.QtGui import QStandardItemModel, QStandardItem, QColor
-from PySide6.QtCore import Qt, QTimer
+from PySide6.QtCore import Qt, QTimer, QObject, QEvent
 
 from .bottom_bar import HistoryBottomBar
 
@@ -21,10 +21,10 @@ _HIST_COL_MIN_WIDTH = {
     "CLOSED TIME": 135,
     "CLOSED PRICE":105,
     "CLOSED VALUE":105,
-    "COMMISSION":   95,
-    "SWAP":         65,
-    "PROFIT/LOSS":  95,
-    "P/L IN %":     85,
+    "COMMISSION":  125,
+    "SWAP":        110,
+    "PROFIT/LOSS": 125,
+    "P/L IN %":     95,
     "REMARK":      110,
 }
 _DEFAULT_MIN = 80
@@ -32,6 +32,19 @@ _DEFAULT_MIN = 80
 
 def _col_min(name: str) -> int:
     return _HIST_COL_MIN_WIDTH.get(name.strip().upper(), _DEFAULT_MIN)
+
+
+class _ViewportResizeFilter(QObject):
+    """Fires a callback whenever the watched viewport is resized.
+    This is the only guaranteed moment viewport().width() is correct."""
+    def __init__(self, callback):
+        super().__init__()
+        self._cb = callback
+
+    def eventFilter(self, obj, event):
+        if event.type() == QEvent.Resize:
+            self._cb()
+        return False          # never consume the event
 
 
 class HistoryTable(QWidget):
@@ -54,8 +67,7 @@ class HistoryTable(QWidget):
         ("pl_pct",       "P/L IN %"),
         ("remarks",      "REMARK"),
     ]
-    # Column header strings in order — used by _redistribute_column_widths
-    _HEADERS = [title for _, title in COLUMNS]
+    headers = [title for _, title in COLUMNS]
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -63,7 +75,7 @@ class HistoryTable(QWidget):
         # ── Table view + model ──────────────────────────────────────────
         self.table_view = QTableView(self)
         self.model = QStandardItemModel(0, len(self.COLUMNS), self)
-        self.model.setHorizontalHeaderLabels(self._HEADERS)
+        self.model.setHorizontalHeaderLabels(self.headers)
         self.table_view.setModel(self.model)
 
         # ── Table behaviour ─────────────────────────────────────────────
@@ -93,7 +105,7 @@ class HistoryTable(QWidget):
         # ── Header ──────────────────────────────────────────────────────
         header = self.table_view.horizontalHeader()
         header.setSectionResizeMode(QHeaderView.Interactive)
-        header.setStretchLastSection(False)   # our logic owns all widths
+        header.setStretchLastSection(False)
         header.setMinimumSectionSize(50)
         header.setDefaultAlignment(Qt.AlignCenter)
         header.setFixedHeight(28)
@@ -102,10 +114,19 @@ class HistoryTable(QWidget):
         # History has no fixed-width delegate columns
         self._fixed_cols = set()
 
-        # ── Bottom bar ──────────────────────────────────────────────────
-        self.bottom_bar = HistoryBottomBar(self)
+        # ── Viewport resize filter ───────────────────────────────────────
+        # This is the KEY fix: fire _redistribute_column_widths the instant
+        # Qt resizes the viewport (i.e. when the tab is first clicked and the
+        # widget gets its real size). viewport().width() is ONLY reliable
+        # inside a Resize event — not in 0ms timers fired from a hidden tab.
+        self._vp_filter = _ViewportResizeFilter(self._redistribute_column_widths)
+        self.table_view.viewport().installEventFilter(self._vp_filter)
 
-        # ── Custom horizontal scrollbar (mirrors OrderTable exactly) ────
+        # ── Bottom bar ──────────────────────────────────────────────────
+        _col_map = {key: idx for idx, (key, _) in enumerate(self.COLUMNS)}
+        self.bottom_bar = HistoryBottomBar(self.table_view, _col_map, parent=self)
+
+        # ── Custom horizontal scrollbar ─────────────────────────────────
         self.h_scrollbar = QScrollBar(Qt.Horizontal, self)
         self.table_view.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
 
@@ -116,7 +137,7 @@ class HistoryTable(QWidget):
         internal_bar.rangeChanged.connect(
             lambda mn, mx: self.h_scrollbar.setVisible(mx > 0))
 
-        # ── Layout (identical structure to OrderTable) ──────────────────
+        # ── Layout — identical to OrderTable ────────────────────────────
         layout = QVBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)
         layout.setSpacing(0)
@@ -138,7 +159,7 @@ class HistoryTable(QWidget):
         self.model.layoutChanged.connect(self._update_bottom_bar)
         self.model.dataChanged.connect(lambda tl, br, r: self._update_bottom_bar())
 
-        # ── Startup (mirrors OrderTable timers exactly) ─────────────────
+        # ── Startup — identical to OrderTable ───────────────────────────
         QTimer.singleShot(0,   self._update_table_height)
         QTimer.singleShot(0,   self._redistribute_column_widths)
         QTimer.singleShot(200, self._update_bottom_bar)
@@ -157,15 +178,10 @@ class HistoryTable(QWidget):
 
     # ── Bottom bar updater ───────────────────────────────────────────────
     def _update_bottom_bar(self):
-        """
-        Walks the model rows and sums commission and P&L.
-        Deposits / Withdrawals are financial account-level values — pass them
-        in via set_deposits() / set_withdrawals() from the account service.
-        """
         try:
-            col_map = {key: idx for idx, (key, _) in enumerate(self.COLUMNS)}
-            pl_col   = col_map.get("pl",         -1)
-            comm_col = col_map.get("commission",  -1)
+            col_map  = {key: idx for idx, (key, _) in enumerate(self.COLUMNS)}
+            pl_col   = col_map.get("pl",        -1)
+            comm_col = col_map.get("commission", -1)
 
             total_pl   = 0.0
             total_comm = 0.0
@@ -173,14 +189,12 @@ class HistoryTable(QWidget):
             for row in range(self.model.rowCount()):
                 if pl_col >= 0:
                     try:
-                        total_pl += float(
-                            self.model.item(row, pl_col).text() or 0)
+                        total_pl += float(self.model.item(row, pl_col).text() or 0)
                     except (ValueError, AttributeError):
                         pass
                 if comm_col >= 0:
                     try:
-                        total_comm += float(
-                            self.model.item(row, comm_col).text() or 0)
+                        total_comm += float(self.model.item(row, comm_col).text() or 0)
                     except (ValueError, AttributeError):
                         pass
 
@@ -199,7 +213,7 @@ class HistoryTable(QWidget):
     def set_withdrawals(self, value: float):
         self.bottom_bar.set_withdrawals(value)
 
-    # ── Column show/hide (exact OrderTable logic) ────────────────────────
+    # ── Column show/hide — identical to OrderTable ───────────────────────
     def toggle_column(self, col_index: int, visible: bool):
         try:
             header = self.table_view.horizontalHeader()
@@ -211,10 +225,14 @@ class HistoryTable(QWidget):
         except Exception:
             pass
 
-    # ── Column width redistribution (exact OrderTable logic) ─────────────
+    # ── Column width redistribution — identical to OrderTable ────────────
+    # Uses viewport().width() directly, exactly like OrderTable.
+    # The _ViewportResizeFilter above guarantees this is only called when
+    # viewport().width() is valid (inside or after a real Resize event).
     def _redistribute_column_widths(self):
         try:
             header     = self.table_view.horizontalHeader()
+            headers    = self.headers
             total_cols = header.count()
             viewport_w = self.table_view.viewport().width()
 
@@ -235,7 +253,7 @@ class HistoryTable(QWidget):
 
             available_w = max(0, viewport_w - fixed_w)
             n           = len(flex_cols)
-            min_widths  = [_col_min(self._HEADERS[i]) for i in flex_cols]
+            min_widths  = [_col_min(headers[i]) for i in flex_cols]
             total_min   = sum(min_widths)
 
             if available_w <= total_min:
@@ -253,7 +271,7 @@ class HistoryTable(QWidget):
         except Exception:
             pass
 
-    # ── Table height (exact OrderTable logic — bottom_bar.height() subtracted)
+    # ── Table height — identical to OrderTable ───────────────────────────
     def _update_table_height(self):
         try:
             header_h  = self.table_view.horizontalHeader().height()
@@ -264,7 +282,6 @@ class HistoryTable(QWidget):
                 content_h = header_h + frame_w
 
             scroll_h    = self.h_scrollbar.height() if self.h_scrollbar.isVisible() else 0
-            # ← KEY: subtract bottom_bar just like OrderTable does
             available_h = self.height() - self.bottom_bar.height() - scroll_h
             if available_h <= 0:
                 available_h = 200
@@ -274,7 +291,7 @@ class HistoryTable(QWidget):
         except Exception:
             pass
 
-    # ── Resize ───────────────────────────────────────────────────────────
+    # ── Resize — identical to OrderTable ────────────────────────────────
     def resizeEvent(self, event):
         super().resizeEvent(event)
         self._update_table_height()

@@ -8,7 +8,7 @@ class BottomBar(QWidget):
         super().__init__()
         self.table_view = table_view
         self.profit_col_index = profit_col_index
-        self.setFixedHeight(28)
+        self.setFixedHeight(32)
         self.setObjectName("orders_bottom_bar")
 
         # ── Raw state (always floats) ────────────────────────────────────
@@ -34,8 +34,8 @@ class BottomBar(QWidget):
         # ── Left container ───────────────────────────────────────────────
         self.content = QWidget(self)
         cl = QHBoxLayout(self.content)
-        cl.setContentsMargins(10, 0, 10, 0)
-        cl.setSpacing(8)
+        cl.setContentsMargins(14, 0, 14, 0)
+        cl.setSpacing(4)
 
         self.lbl_currency     = QLabel()
         self.lbl_balance      = QLabel()
@@ -205,7 +205,7 @@ class BottomBar(QWidget):
             except Exception:
                 sc = "#CBD5E1"
             for s in self._separators:
-                s.setStyleSheet(f"color:{sc}; margin-left:6px; margin-right:6px;")
+                s.setStyleSheet(f"color:{sc}; margin-left:22px; margin-right:22px;")
         except Exception:
             pass
 
@@ -273,8 +273,8 @@ class BottomBar(QWidget):
             ct = "#1976d2"
             cv = value_color or "#1F2937"
         return (
-            f"<span style='color:{ct}; font-size:12px; font-weight:600;'>{title}:</span>"
-            f" &nbsp;<b style='color:{cv}; font-size:12px;'>{value}</b>"
+            f"<span style='color:{ct}; font-size:13px; font-weight:600;'>{title}:</span>"
+            f"&nbsp;&nbsp;&nbsp;<b style='color:{cv}; font-size:13px;'>{value}</b>"
         )
 
     def _refresh_all_labels(self):
@@ -302,7 +302,7 @@ class BottomBar(QWidget):
                 self.net_pl_title.hide()
             else:
                 self.net_pl_title.show()
-                self.net_pl_title.setGeometry(final_x - 85, 0, 80, self.height())
+                self.net_pl_title.setGeometry(final_x - 105, 0, 100, self.height())
 
             self.net_pl_value.show()
             self.net_pl_value.setGeometry(final_x, 0, col_width, self.height())
@@ -324,15 +324,25 @@ class BottomBar(QWidget):
 class HistoryBottomBar(QWidget):
     """
     Bottom summary bar for the History table.
-    Shows: Account Currency | Deposits | Withdrawals | Comm | NET P&L
-    Lives in the same file as BottomBar so no extra imports are needed.
-    Usage in history_table.py:
-        from .bottom_bar import HistoryBottomBar
+
+    Left side (static HBox):
+        Account Currency | Deposits | Withdrawals
+
+    Right side (floating, absolutely positioned over columns):
+        Comm     — aligned to COMMISSION column
+        Swap     — aligned to SWAP column
+        Net P&L  — aligned to PROFIT/LOSS column
+
+    Constructor:
+        HistoryBottomBar(table_view, col_map, parent=self)
+        col_map = {'commission': idx, 'swap': idx, 'pl': idx}
     """
 
-    def __init__(self, parent=None):
+    def __init__(self, table_view, col_map: dict, parent=None):
         super().__init__(parent)
-        self.setFixedHeight(28)
+        self.table_view = table_view
+        self.col_map    = col_map          # {key: logical_col_index}
+        self.setFixedHeight(32)
         self.setObjectName("history_bottom_bar")
 
         # ── Raw state ────────────────────────────────────────────────────
@@ -340,6 +350,7 @@ class HistoryBottomBar(QWidget):
         self._deposits    = 0.0
         self._withdrawals = 0.0
         self._comm        = 0.0
+        self._swap        = 0.0
         self._net_pl      = 0.0
         self._separators  = []
 
@@ -355,37 +366,44 @@ class HistoryBottomBar(QWidget):
                 "#history_bottom_bar { background: #F9FAFB; border-top: 1px solid #E5E7EB; }"
             )
 
-        # ── Layout ───────────────────────────────────────────────────────
-        layout = QHBoxLayout(self)
-        layout.setContentsMargins(10, 0, 10, 0)
-        layout.setSpacing(8)
+        # ── Static left container (Currency | Deposits | Withdrawals) ────
+        self.content = QWidget(self)
+        cl = QHBoxLayout(self.content)
+        cl.setContentsMargins(14, 0, 14, 0)
+        cl.setSpacing(4)
+
+        self._static_seps = []   # left-side separators styled independently
+
+        def _sep():
+            s = QLabel("|")
+            s.setAlignment(Qt.AlignCenter)
+            self._separators.append(s)
+            self._static_seps.append(s)
+            return s
 
         self.lbl_currency    = QLabel()
         self.lbl_deposits    = QLabel()
         self.lbl_withdrawals = QLabel()
-        self.lbl_comm        = QLabel()
-        self.lbl_net_pl      = QLabel()
 
-        def sep():
-            s = QLabel("|")
-            s.setAlignment(Qt.AlignCenter)
-            self._separators.append(s)
-            return s
+        cl.addWidget(self.lbl_currency)
+        cl.addWidget(_sep()); cl.addWidget(self.lbl_deposits)
+        cl.addWidget(_sep()); cl.addWidget(self.lbl_withdrawals)
+        cl.addStretch()
 
-        widgets = [
-            self.lbl_currency,
-            self.lbl_deposits,
-            self.lbl_withdrawals,
-            self.lbl_comm,
-            self.lbl_net_pl,
-        ]
-        for i, w in enumerate(widgets):
-            layout.addWidget(w)
-            if i < len(widgets) - 1:
-                layout.addWidget(sep())
-        layout.addStretch()
+        # ── Floating labels (absolutely positioned over columns) ──────────
+        self.lbl_comm    = QLabel(self)
+        self.lbl_swap    = QLabel(self)
+        self.lbl_net_pl  = QLabel(self)
+        for lbl in (self.lbl_comm, self.lbl_swap, self.lbl_net_pl):
+            lbl.setAlignment(Qt.AlignCenter)
 
-        # ── Subscribe to account data (currency) ─────────────────────────
+        # Re-align whenever column geometry changes
+        header = self.table_view.horizontalHeader()
+        header.sectionResized.connect(self._align_floating_labels)
+        header.sectionMoved.connect(self._align_floating_labels)
+        self.table_view.horizontalScrollBar().valueChanged.connect(self._align_floating_labels)
+
+        # ── Subscribe to account data ─────────────────────────────────────
         try:
             store = AppStore.instance()
             store.account_changed.connect(self._on_account_changed)
@@ -394,8 +412,10 @@ class HistoryBottomBar(QWidget):
             pass
 
         self._refresh_all_labels()
+        QTimer.singleShot(0,  self._initial_layout)
+        QTimer.singleShot(10, self._align_floating_labels)
 
-    # ── Public setters (called by HistoryTable) ──────────────────────────
+    # ── Public setters ───────────────────────────────────────────────────
 
     def set_currency(self, currency: str):
         self._currency = currency or "USD"
@@ -413,18 +433,71 @@ class HistoryBottomBar(QWidget):
         self._comm = float(value)
         self._refresh_all_labels()
 
+    def set_swap(self, value: float):
+        self._swap = float(value)
+        self._refresh_all_labels()
+
     def set_net_pl(self, value: float):
         self._net_pl = float(value)
         self._refresh_all_labels()
 
-    # ── Account change handler (pull currency from account store) ─────────
+    # ── Column-visibility mirror ──────────────────────────────────────────
+
+    def show_column_label(self, col_key: str, visible: bool):
+        mapping = {"commission": self.lbl_comm,
+                   "swap":       self.lbl_swap,
+                   "pl":         self.lbl_net_pl}
+        lbl = mapping.get(col_key)
+        if lbl:
+            lbl.setVisible(visible)
+
+    def sync_to_header(self, header, col_map: dict):
+        for col_key in ("commission", "swap", "pl"):
+            idx = col_map.get(col_key, -1)
+            if idx >= 0:
+                self.show_column_label(col_key, not header.isSectionHidden(idx))
+        self._align_floating_labels()
+
+    # ── Floating label positioning ────────────────────────────────────────
+
+    def _align_floating_labels(self, *args):
+        try:
+            header = self.table_view.horizontalHeader()
+            v_w = (self.table_view.verticalHeader().width()
+                   if self.table_view.verticalHeader().isVisible() else 0)
+            h = self.height()
+
+            for col_key, lbl in (("commission", self.lbl_comm),
+                                  ("swap",       self.lbl_swap),
+                                  ("pl",         self.lbl_net_pl)):
+                col_idx = self.col_map.get(col_key, -1)
+                if col_idx < 0:
+                    lbl.hide()
+                    continue
+
+                if header.isSectionHidden(col_idx):
+                    lbl.hide()
+                    continue
+
+                visual_idx = header.visualIndex(col_idx)
+                vp_x       = header.sectionViewportPosition(visual_idx)
+                col_w      = header.sectionSize(visual_idx)
+
+                if vp_x < 0:          # scrolled off left
+                    lbl.hide()
+                    continue
+
+                lbl.show()
+                lbl.setGeometry(v_w + vp_x, 0, col_w, h)
+        except Exception:
+            pass
+
+    # ── Account change handler ────────────────────────────────────────────
 
     def _on_account_changed(self, account_info):
         try:
             store    = AppStore.instance()
             api_resp = store.get_api_response()
-            # Reuse BottomBar's _find_source logic via a throwaway instance trick
-            # — or just do it inline since it's simple:
             all_accs = []
             if isinstance(api_resp, dict):
                 all_accs.extend(api_resp.get('accounts') or [])
@@ -465,35 +538,39 @@ class HistoryBottomBar(QWidget):
         try:
             from Theme.theme_manager import ThemeManager
             tok = ThemeManager.instance().tokens()
-            ct  = tok.get("accent",       "#1976d2")
-            cv  = tok.get("text_primary",  "#1F2937")
-            sc  = tok.get("border_separator", "#CBD5E1")
+            ct  = tok.get("accent",           "#1976d2")
+            cv  = tok.get("text_primary",      "#1F2937")
+            sc  = tok.get("border_separator",  "#CBD5E1")
         except Exception:
             ct, cv, sc = "#1976d2", "#1F2937", "#CBD5E1"
 
-        def _fmt(title, value, value_color=None):
-            color = value_color or cv
+        def _fmt(title, value, vc=None):
+            c = vc or cv
             return (
-                f"<span style='color:{ct}; font-size:12px; font-weight:600;'>{title}:</span>"
-                f" &nbsp;<b style='color:{color}; font-size:12px;'>{value}</b>"
+                f"<span style='color:{ct}; font-size:13px; font-weight:600;'>{title}:</span>"
+                f"&nbsp;&nbsp;&nbsp;<b style='color:{c}; font-size:13px;'>{value}</b>"
             )
 
-        w_color  = "#EF4444" if self._withdrawals < 0 else cv
-        pl_color = "#22C55E" if self._net_pl >= 0 else "#EF4444"
+        w_color    = "#EF4444" if self._withdrawals < 0 else cv
+        swap_color = "#EF4444" if self._swap        < 0 else cv
+        pl_color   = "#22C55E" if self._net_pl     >= 0 else "#EF4444"
+        sign       = "+" if self._net_pl >= 0 else ""
 
-        self.lbl_currency.setText(
-            _fmt("Account Currency", self._currency))
-        self.lbl_deposits.setText(
-            _fmt("Deposits", f"{self._deposits:,.2f}"))
-        self.lbl_withdrawals.setText(
-            _fmt("Withdrawals", f"{self._withdrawals:,.2f}", w_color))
-        self.lbl_comm.setText(
-            _fmt("Comm", f"{self._comm:,.2f}"))
-        self.lbl_net_pl.setText(
-            _fmt("NET P&L", f"{self._net_pl:,.2f}", pl_color))
+        self.lbl_currency.setText(   _fmt("Account Currency", self._currency))
+        self.lbl_deposits.setText(   _fmt("Deposits",         f"{self._deposits:,.2f}"))
+        self.lbl_withdrawals.setText(_fmt("Withdrawals",      f"{self._withdrawals:,.2f}", w_color))
+
+        self.lbl_comm.setText(  _fmt("Comm",    f"{self._comm:,.2f}"))
+        self.lbl_swap.setText(  _fmt("Swap",    f"{self._swap:,.2f}", swap_color))
+        self.lbl_net_pl.setText(_fmt("Net P&L", f"{sign}{self._net_pl:,.2f}", pl_color))
 
         for s in self._separators:
-            s.setStyleSheet(f"color:{sc}; margin-left:6px; margin-right:6px;")
+            if s in self._static_seps:
+                s.setStyleSheet(f"color:{sc}; margin-left:32px; margin-right:32px;")
+            else:
+                s.setStyleSheet(f"color:{sc}; margin-left:22px; margin-right:22px;")
+
+        self._align_floating_labels()
 
     # ── Style ────────────────────────────────────────────────────────────
 
@@ -506,5 +583,12 @@ class HistoryBottomBar(QWidget):
 
     # ── Qt overrides ─────────────────────────────────────────────────────
 
+    def _initial_layout(self):
+        self.content.setFixedHeight(self.height())
+        self.content.move(0, 0)
+        self._align_floating_labels()
+
     def resizeEvent(self, event):
         super().resizeEvent(event)
+        self.content.resize(self.width(), self.height())
+        self._align_floating_labels()

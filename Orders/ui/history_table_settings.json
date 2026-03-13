@@ -1,8 +1,8 @@
 {
-  "Entry Value": false,
-  "Swap": false,
-  "Closed Value": false,
-  "Commission": false,
-  "P/L in %": false,
-  "Remark": false
+  "Entry Value": true,
+  "Swap": true,
+  "Closed Value": true,
+  "Commission": true,
+  "P/L in %": true,
+  "Remark": true
 }
