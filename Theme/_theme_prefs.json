@@ -1,6 +1,6 @@
 {
-  "theme": "dark",
-  "crazy_color": "green",
+  "theme": "light",
+  "crazy_color": "yellow",
   "time_period_overrides": {
     "morning": "dark",
     "night": "light",

@@ -12,7 +12,8 @@ from MarketWatch_jetfyx.ui.advance_view_delegate import AdvanceViewDelegate
 class MarketTable(QTableView):
     """Table view for displaying market symbols with expandable trade panels"""
 
-    favoriteToggled = Signal(str, bool)  # symbol_name, is_favorite
+    favoriteToggled = Signal(str, bool)
+    symbolSelected = Signal(str)  # symbol_name, is_favorite
 
     # --------------------------------------------------
     # 🔄 PARTIAL UPDATE (NO REBUILD)
@@ -179,6 +180,8 @@ class MarketTable(QTableView):
         symbol = row_data.get("symbol", "")
         sell = row_data.get("sell", "")
         buy = row_data.get("buy", "")
+
+        self.symbolSelected.emit(symbol)
 
         self.original_row_data = row_data.copy()
 

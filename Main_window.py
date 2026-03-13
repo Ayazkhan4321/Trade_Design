@@ -204,6 +204,21 @@ class MainWindow(QMainWindow):
                     pass
         self.chart_widget = TradingChartPlugin()
         self.setCentralWidget(self.chart_widget)
+        
+        # ── Wire chart plugin to market_widget ──
+        try:
+            if hasattr(self, 'market_widget') and self.market_widget is not None:
+                self.market_widget.chart_plugin = self.chart_widget
+        
+                self.market_widget.favorites_table.symbolSelected.connect(
+                    self.chart_widget.load_symbol
+                )
+                if hasattr(self.market_widget.all_symbols_tree, 'symbolSelected'):
+                    self.market_widget.all_symbols_tree.symbolSelected.connect(
+                        self.chart_widget.load_symbol
+                    )
+        except Exception as _e:
+            print(f"[MainWindow] Chart wire-up error: {_e}")
 
     def _setup_theme_toolbar_button(self):
         """
