@@ -1,9 +1,18 @@
 {
+<<<<<<< HEAD
   "Entry Value": true,
   "Commission": true,
   "Market Value": true,
   "Swap": false,
   "P/L in %": true,
   "Remarks": true,
+=======
+  "Entry Value": false,
+  "Commission": false,
+  "Market Value": false,
+  "Swap": false,
+  "P/L in %": false,
+  "Remarks": false,
+>>>>>>> 244051686dda114f1a21d3ae60d925e152ba55ed
   "Multi-Target SL/TP": false
 }

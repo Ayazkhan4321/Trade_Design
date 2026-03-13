@@ -30,7 +30,7 @@ try:
     from Left_panel.MarketWatch_jetfyx.services.settings_service import SettingsService
     from Left_panel.MarketWatch_jetfyx.services.order_service import OrderService
     from Left_panel.MarketWatch_jetfyx.services.price_service import PriceService
-    from PySide6.QtWidgets import QDockWidget
+    from PySide6.QtWidgets import QDockWidget, QWidget as _QWidget
 except Exception as e:
     import traceback
     print("Left_panel import failed:")
@@ -41,6 +41,28 @@ except Exception as e:
     QDockWidget = None
 
 print(f"Left panel available: {LeftPanelWidget is not None}, AccountsWidget: {AccountsWidget is not None}, MarketWidget: {MarketWidget is not None}")
+
+
+
+class _NoTitleDock(QDockWidget):
+    """QDockWidget with title bar hidden in both docked and floating states."""
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.setWindowTitle("")
+        # Store empty title bar widget as instance attr so Python won't GC it
+        self._empty_tb = _QWidget(self)
+        self._empty_tb.setMaximumHeight(0)
+        self.setTitleBarWidget(self._empty_tb)
+
+    def setFloating(self, floating):
+        super().setFloating(floating)
+        if floating:
+            # Remove OS window frame when floating so no title bar appears
+            self.setWindowFlags(
+                self.windowFlags()
+                | __import__('PySide6.QtCore', fromlist=['Qt']).Qt.FramelessWindowHint
+            )
+            self.show()
 
 
 class MainWindow(QMainWindow):
@@ -104,15 +126,24 @@ class MainWindow(QMainWindow):
                 )
                 self.left_panel_widget = LeftPanelWidget(self.market_widget, self.accounts_widget, parent=self)
 
-                self.left_panel_dock = QDockWidget("Left Panel", self)
+                self.left_panel_dock = _NoTitleDock(self)
                 self.left_panel_dock.setObjectName("LeftPanelDock")
                 self.left_panel_dock.setWidget(self.left_panel_widget)
                 self.left_panel_dock.setAllowedAreas(Qt.LeftDockWidgetArea | Qt.RightDockWidgetArea)
                 self.addDockWidget(Qt.LeftDockWidgetArea, self.left_panel_dock)
+                # Wire ✕ close button to close the dock (must be after dock is created)
+                self.left_panel_widget.closeRequested.connect(self.left_panel_dock.hide)
+                # Sync menu checkbox when closed via button
+                try:
+                    self.left_panel_widget.closeRequested.connect(
+                        lambda: self.ui.actionMarket_Watch.setChecked(False)
+                    )
+                except Exception:
+                    pass
                 try:
                     # Configure dock features and visibility based on signed-in state
                     self.left_panel_dock.setFeatures(
-                        QDockWidget.DockWidgetClosable | QDockWidget.DockWidgetMovable | QDockWidget.DockWidgetFloatable
+                        QDockWidget.DockWidgetMovable | QDockWidget.DockWidgetFloatable
                     )
                     self.left_panel_dock.setFloating(False)
                     # Only show by default when a session exists
@@ -285,7 +316,7 @@ class MainWindow(QMainWindow):
 
         try:
             from Orders.ui.order_dock import OrderDock
-            from PySide6.QtWidgets import QDockWidget
+            from PySide6.QtWidgets import QDockWidget, QWidget as _QWidget
             from PySide6.QtCore import Qt
 
             self.orders_dock = OrderDock(

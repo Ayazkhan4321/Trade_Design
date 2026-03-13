@@ -1,6 +1,11 @@
 {
+<<<<<<< HEAD
   "theme": "light",
   "crazy_color": "yellow",
+=======
+  "theme": "crazy_green",
+  "crazy_color": "green",
+>>>>>>> 244051686dda114f1a21d3ae60d925e152ba55ed
   "time_period_overrides": {
     "morning": "dark",
     "night": "light",

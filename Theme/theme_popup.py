@@ -356,8 +356,10 @@ class ThemePopup(QWidget):
 
     def __init__(self, parent: QWidget = None):
         super().__init__(parent)
-        # No window flags — pure child widget
-        self.setAttribute(Qt.WA_StyledBackground, True)
+        # No window flags — pure child widget.
+        # WA_TranslucentBackground makes the region outside the card fully
+        # transparent so no coloured rectangle appears around the panel.
+        self.setAttribute(Qt.WA_TranslucentBackground, True)
 
         self._mgr = ThemeManager.instance()
         self._visible = False
@@ -371,8 +373,9 @@ class ThemePopup(QWidget):
         self._refresh_styles()
         self._mgr.theme_changed.connect(lambda name, t: self._refresh_styles())
 
-        if parent:
-            parent.installEventFilter(self)
+        # Install on QApplication so clicks on ANY widget in the window
+        # (chart, panels, toolbars, etc.) trigger close — not just the parent.
+        QApplication.instance().installEventFilter(self)
 
         # Child widgets are visible by default — hide until show_popup() is called
         self.hide()
@@ -383,14 +386,31 @@ class ThemePopup(QWidget):
             event.type() == QEvent.MouseButtonPress
             and self._visible
             and self.isVisible()
-            and obj is self.parent()
         ):
+            # obj is whatever widget was clicked; map its click position to
+            # global coords so we can compare against our own global rect.
             try:
-                pos = event.position().toPoint()
+                local_pos = event.position().toPoint()
             except AttributeError:
-                pos = event.pos()
-            if not self.geometry().contains(pos):
+                local_pos = event.pos()
+
+            if isinstance(obj, QWidget):
+                global_pos = obj.mapToGlobal(local_pos)
+            else:
+                global_pos = local_pos
+
+            popup_global = QRect(
+                self.mapToGlobal(self.rect().topLeft()),
+                self.size(),
+            )
+
+            # Only close if the click is in the same top-level window
+            # but outside the popup panel itself.
+            top_level = self.window()
+            clicked_top = obj.window() if isinstance(obj, QWidget) else None
+            if clicked_top is top_level and not popup_global.contains(global_pos):
                 self.hide_popup()
+
         return super().eventFilter(obj, event)
 
     # ------------------------------------------------------------------
@@ -842,13 +862,14 @@ class ThemePopup(QWidget):
         self.setGeometry(start_rect)
         self._sync_toggles()
         self.show()
-        self.raise_()   # above siblings, but NOT above other apps
+        self.raise_()          # float above the chart and all sibling widgets
 
         anim = QPropertyAnimation(self, b"geometry", self)
         anim.setDuration(240)
         anim.setEasingCurve(QEasingCurve.OutCubic)
         anim.setStartValue(start_rect)
         anim.setEndValue(end_rect)
+        anim.finished.connect(self.raise_)   # re-raise after slide completes
         anim.start()
         self._anim    = anim
         self._visible = True

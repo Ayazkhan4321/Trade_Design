@@ -1,109 +1,127 @@
-from PySide6.QtWidgets import QStyledItemDelegate, QMessageBox
-from PySide6.QtGui import QPainter
-from PySide6.QtCore import Qt, QRect, QEvent, QModelIndex, QTimer
-import logging
+"""
+action_delegate.py
+──────────────────
+Place this file at:
+    Orders/ui/delegates/action_delegate.py
 
+Requires toast_notifications.py in the SAME folder:
+    Orders/ui/delegates/toast_notifications.py
+"""
+
+from PySide6.QtWidgets import QStyledItemDelegate
+from PySide6.QtGui     import QColor
+from PySide6.QtCore    import Qt, QEvent, QModelIndex, QTimer
+
+# toast_notifications.py must be in the same delegates/ folder
+from .toast_notifications import show_info, show_warn, show_error
+
+import logging
 LOG = logging.getLogger(__name__)
 
 
+# ── Shared row-removal helper (also used by bulk-close) ───────────────────
+def _remove_row(model, order_id: str) -> None:
+    """Safely remove the row matching order_id from model.orders."""
+    str_id = str(order_id)
+    for i, o in enumerate(model.orders):
+        if str(o.get('id') or o.get('orderId', '')) == str_id:
+            try:
+                model.beginRemoveRows(QModelIndex(), i, i)
+                model.orders.pop(i)
+                model.endRemoveRows()
+                LOG.debug("Row %s removed for order_id=%s", i, order_id)
+            except Exception:
+                LOG.exception("Failed removing row %s", i)
+            return
+
+
+# ── CloseDelegate ─────────────────────────────────────────────────────────
 class CloseDelegate(QStyledItemDelegate):
+    """
+    Renders a red ✕ in every cell of the Actions column.
+    Left-clicking fires cancel_order() and shows a pill toast.
+    """
+
     def __init__(self, parent=None, order_service=None):
         super().__init__(parent)
-        self.order_service = order_service
-        self._processing_ids = set() 
+        self.order_service   = order_service
+        self._processing_ids = set()
 
+    # ── Paint ✕ / spinner ────────────────────────────────────────────
     def paint(self, painter, option, index):
         painter.save()
-
-        rect = option.rect
-        
         try:
-            model = index.model()
-            order_id = model.orders[index.row()].get('id')
-            
+            order_id = index.model().orders[index.row()].get('id')
             if order_id in self._processing_ids:
-                painter.setPen(Qt.gray)
-                painter.drawText(rect, Qt.AlignCenter, "...")
+                painter.setPen(QColor("#94a3b8"))
+                painter.drawText(option.rect, Qt.AlignCenter, "···")
             else:
-                painter.setPen(Qt.red)
-                painter.drawText(rect, Qt.AlignCenter, "✕")
+                painter.setPen(QColor("#ef4444"))
+                painter.drawText(option.rect, Qt.AlignCenter, "✕")
         except Exception:
-            painter.setPen(Qt.red)
-            painter.drawText(rect, Qt.AlignCenter, "✕")
-
+            painter.setPen(QColor("#ef4444"))
+            painter.drawText(option.rect, Qt.AlignCenter, "✕")
         painter.restore()
 
+    # ── Handle click ─────────────────────────────────────────────────
     def editorEvent(self, event, model, option, index):
-        # Only handle left-button mouse releases
-        if event.type() == QEvent.MouseButtonRelease and getattr(event, 'button', lambda: None)() == Qt.LeftButton:
-            row = index.row()
-            LOG.debug("Close order at row %s", row)
+        if not (event.type() == QEvent.MouseButtonRelease
+                and getattr(event, 'button', lambda: None)() == Qt.LeftButton
+                and option.rect.contains(event.pos())):
+            return False
 
-            # Try to close via OrderService if available; fall back to local removal
+        row = index.row()
+        try:
+            order    = model.orders[row]
+            order_id = order.get('id') or order.get('orderId')
+        except Exception:
+            LOG.exception("Cannot read order at row %s", row)
+            return False
+
+        if not order_id:
+            LOG.warning("No order_id at row %s", row)
+            return False
+
+        if order_id in self._processing_ids:
+            return True   # already in-flight
+
+        self._processing_ids.add(order_id)
+
+        # snapshot before async
+        sym   = (order.get('symbol') or order.get('Symbol') or '').upper()
+        typ   = (order.get('type')   or order.get('orderType') or '').capitalize()
+        label = f"{sym} {typ}".strip()
+        pw    = self.parent()
+        svc   = self.order_service
+
+        def _do_close():
             try:
-                order = model.orders[row]
-                order_id = order.get('id') or order.get('orderId')
-            except Exception:
-                LOG.exception("Failed reading order at row %s", row)
-                return False
+                if svc:
+                    try:
+                        ok = svc.cancel_order(order_id)
+                    except Exception:
+                        LOG.exception("cancel_order raised for id=%s", order_id)
+                        show_error(pw, "Error closing order. Please try again.")
+                        return
 
-            if order_id in self._processing_ids:
-                return True
+                    if ok:
+                        LOG.info("Order %s closed OK", order_id)
+                        _remove_row(model, order_id)
+                        show_info(pw,
+                            f"{label} order closed successfully.".strip()
+                            if label else "Order closed successfully.")
+                    else:
+                        LOG.warning("Server refused close for %s", order_id)
+                        show_warn(pw,
+                            f"Order {order_id} could not be closed by the server.")
+                else:
+                    # no service wired (dev/offline) — remove locally
+                    _remove_row(model, order_id)
+                    show_info(pw,
+                        f"{label} order removed.".strip() if label else "Order removed.")
 
-            self._processing_ids.add(order_id)
+            finally:
+                self._processing_ids.discard(order_id)
 
-            def _do_close():
-                try:
-                    if self.order_service:
-                        try:
-                            LOG.debug("Calling OrderService.cancel_order for id=%s", order_id)
-                            ok = self.order_service.cancel_order(order_id)
-                            if ok:
-                                LOG.info("Order %s closed successfully", order_id)
-                                # Show a confirmation message to the user with symbol and type
-                                try:
-                                    sym = order.get('symbol') or order.get('Symbol') or ''
-                                    typ = order.get('type') or order.get('orderType') or ''
-                                    title = "Order Closed"
-                                    body = f"{sym} {typ} order closed"
-                                    QMessageBox.information(self.parent() or None, title, body)
-                                except Exception:
-                                    LOG.exception("Failed showing order-closed message box for %s", order_id)
-                                    
-                                for i, o in enumerate(model.orders):
-                                    if str(o.get('id') or o.get('orderId')) == str(order_id):
-                                        try:
-                                            model.beginRemoveRows(QModelIndex(), i, i)
-                                            model.orders.pop(i)
-                                            model.endRemoveRows()
-                                        except Exception:
-                                            LOG.exception("Failed to remove order row %s after successful close", i)
-                                        break
-                                return True
-                            else:
-                                LOG.warning("OrderService reported failure closing order %s", order_id)
-                                QMessageBox.warning(self.parent() or None, "Action Failed", f"Order {order_id} could not be closed by the server.")
-                                return False
-                        except Exception:
-                            LOG.exception("Exception when calling OrderService.cancel_order for %s", order_id)
-                            QMessageBox.critical(self.parent() or None, "Error", f"Error closing order.")
-                            return False
-
-                    # No order_service: remove locally (best-effort)
-                    for i, o in enumerate(model.orders):
-                        if str(o.get('id') or o.get('orderId')) == str(order_id):
-                            try:
-                                model.beginRemoveRows(QModelIndex(), i, i)
-                                model.orders.pop(i)
-                                model.endRemoveRows()
-                            except Exception:
-                                LOG.exception("Failed to remove order row %s", i)
-                            break
-
-                finally:
-                    self._processing_ids.discard(order_id)
-
-            QTimer.singleShot(0, _do_close)
-            return True
-
-        return False
+        QTimer.singleShot(0, _do_close)
+        return True

@@ -77,12 +77,24 @@ def _col_index(tv, name: str) -> Optional[int]:
     return None
 
 
-def _set_visible(tv, header: str, visible: bool) -> None:
-    idx = _col_index(tv, header)
-    if idx is None:
-        LOG.warning("Column not found: %r", header)
-        return
-    tv.setColumnHidden(idx, not visible)
+# ✅ FIX: Use toggle_column() on the OrderTable widget so redistribution fires.
+# Falls back to setColumnHidden on the raw QTableView if OrderTable not found.
+def _set_visible(order_table_or_tv, header: str, visible: bool) -> None:
+    # If we have an OrderTable widget with toggle_column, use it
+    if hasattr(order_table_or_tv, 'toggle_column') and hasattr(order_table_or_tv, 'table_view'):
+        tv = order_table_or_tv.table_view
+        idx = _col_index(tv, header)
+        if idx is None:
+            LOG.warning("Column not found: %r", header)
+            return
+        order_table_or_tv.toggle_column(idx, visible)
+    else:
+        # Fallback: raw QTableView
+        idx = _col_index(order_table_or_tv, header)
+        if idx is None:
+            LOG.warning("Column not found: %r", header)
+            return
+        order_table_or_tv.setColumnHidden(idx, not visible)
 
 
 def _load(path: str, labels: list[str], default: bool) -> dict:
@@ -120,7 +132,6 @@ class BaseThemedDialog(QDialog):
     def __init__(self, parent=None, title="Table Settings"):
         super().__init__(parent)
         
-        # 🟢 FIX: We use standard frameless window to prevent OS interference
         self.setWindowFlags(Qt.Dialog | Qt.FramelessWindowHint)
         self.setAttribute(Qt.WA_TranslucentBackground, True)
         self.setModal(True)
@@ -155,9 +166,8 @@ class BaseThemedDialog(QDialog):
             except Exception:
                 pass
 
-    # 🟢 THE FIX: Block Qt's auto-centering
     def exec(self):
-        self.setAttribute(Qt.WA_Moved, True) # Tell Qt to leave the position alone
+        self.setAttribute(Qt.WA_Moved, True)
         self.adjustSize()
         self._snap_to_button()
         return super().exec()
@@ -170,7 +180,6 @@ class BaseThemedDialog(QDialog):
         try:
             btn = None
             
-            # Find the gear button globally
             for w in QApplication.topLevelWidgets():
                 btn = w.findChild(QPushButton, "OrdersSettingsBtn")
                 if btn and btn.isVisible():
@@ -183,27 +192,20 @@ class BaseThemedDialog(QDialog):
 
             if btn and btn.isVisible():
                 btn_pos = btn.mapToGlobal(QPoint(0, 0))
-                
-                # 🟢 THE FIX: Snap the Right edge of the dialog to the LEFT edge of the button
                 x = btn_pos.x() - self.width() - 8
-                
-                # 🟢 THE FIX: Align the Top edge of the dialog with the Top edge of the button
                 y = btn_pos.y()
                 
-                # Smart screen boundary protection
                 screen = QApplication.screenAt(btn_pos)
                 if not screen:
                     screen = QApplication.primaryScreen()
                     
                 if screen:
                     geom = screen.availableGeometry()
-                    # If it clips the bottom of the screen, slide it upwards so it fits perfectly!
                     if (y + self.height()) > geom.bottom():
                         y = geom.bottom() - self.height() - 8
                         
                 self.move(x, y)
             else:
-                # Failsafe: Open next to the mouse cursor
                 mouse_pos = QCursor.pos()
                 self.move(mouse_pos.x() - self.width() - 15, mouse_pos.y() - 10)
                 
@@ -394,7 +396,7 @@ class OrderTableSettingsDialog(BaseThemedDialog):
 
     def __init__(self, parent=None, table_view=None):
         super().__init__(parent, title="Table Settings")
-        self._tv = table_view
+        self._tv = table_view       # may be QTableView or OrderTable widget
         self._cfg = _load(
             _ORDER_CFG,
             [key for key, _, _ in self.COLUMNS] + ["Multi-Target SL/TP"],
@@ -441,37 +443,72 @@ class OrderTableSettingsDialog(BaseThemedDialog):
     def _on_toggle(self, key: str, header: str, checked: bool) -> None:
         self._cfg[key] = checked
         _save(_ORDER_CFG, self._cfg)
-        tv = self._get_tv()
-        if tv: _set_visible(tv, header, checked)
+        # ✅ Get the OrderTable widget (not just the QTableView)
+        obj = self._get_order_table()
+        if obj:
+            _set_visible(obj, header, checked)
 
     def _persist_only(self, key: str, checked: bool) -> None:
         self._cfg[key] = checked
         _save(_ORDER_CFG, self._cfg)
 
-    def _get_tv(self):
-        if self._tv is not None: return self._tv
+    def _get_order_table(self):
+        """✅ Returns the OrderTable widget (which has toggle_column).
+        Falls back to the raw QTableView if OrderTable is not found."""
+        # If already stored and valid
+        if self._tv is not None:
+            # If it has toggle_column it IS the OrderTable
+            if hasattr(self._tv, 'toggle_column'):
+                return self._tv
+            # It's a QTableView — try to find OrderTable as its parent
+            p = self._tv.parent()
+            while p is not None:
+                if hasattr(p, 'toggle_column') and hasattr(p, 'table_view'):
+                    self._tv = p
+                    return p
+                try:
+                    p = p.parent()
+                except Exception:
+                    break
+
+        # Walk up from dialog parent looking for the OrderTable widget
         p = self.parent()
         while p is not None:
+            # Check common attribute paths to find the OrderTable
             for path in (
-                ("orders_widget", "orders_tab", "table", "table_view"),
-                ("table", "table_view"),
+                ("orders_widget", "orders_tab", "table"),   # OrderTable widget
+                ("orders_tab", "table"),
+                ("table",),
             ):
                 try:
                     obj = p
-                    for attr in path: obj = getattr(obj, attr)
-                    if obj is not None:
+                    for attr in path:
+                        obj = getattr(obj, attr)
+                    if obj is not None and hasattr(obj, 'toggle_column'):
                         self._tv = obj
                         return obj
-                except AttributeError: pass
-            try: p = p.parent()
-            except Exception: break
-        return None
+                except AttributeError:
+                    pass
+
+            # Also check if parent itself is the OrderTable
+            if hasattr(p, 'toggle_column') and hasattr(p, 'table_view'):
+                self._tv = p
+                return p
+
+            try:
+                p = p.parent()
+            except Exception:
+                break
+
+        # Last resort: return raw QTableView (old behaviour, no redistribution)
+        return self._tv
 
     def _apply_all(self):
-        tv = self._get_tv()
-        if tv is None: return
+        obj = self._get_order_table()
+        if obj is None:
+            return
         for key, header, _ in self.COLUMNS:
-            _set_visible(tv, header, bool(self._cfg.get(key, False)))
+            _set_visible(obj, header, bool(self._cfg.get(key, False)))
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -527,7 +564,8 @@ class HistoryTableSettingsDialog(BaseThemedDialog):
         self._cfg[key] = checked
         _save(_HIST_CFG, self._cfg)
         tv = self._get_tv()
-        if tv: _set_visible(tv, header, checked)
+        if tv:
+            _set_visible(tv, header, checked)
 
     def _get_tv(self):
         if self._tv is not None: return self._tv
