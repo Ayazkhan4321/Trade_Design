@@ -10,7 +10,6 @@ from PySide6.QtWidgets import (
     QStackedWidget,
 )
 from PySide6.QtCore import Qt
-
 from MarketWatch_jetfyx.ui.market_table import MarketTable
 from MarketWatch_jetfyx.ui.symbol_tree_view import SymbolTreeView
 from MarketWatch_jetfyx.components.tab_bar import TabBar
@@ -19,7 +18,7 @@ from MarketWatch_jetfyx.dialogs.settings_dialog import SettingsDialog
 from MarketWatch_jetfyx.core.symbol_manager import SymbolManager
 from MarketWatch_jetfyx.services.market_data_service import MarketDataService
 from accounts.store import AppStore
-
+from plugins.tradingview_plugin import TradingChartPlugin
 try:
     from Theme.theme_manager import ThemeManager as _ThemeManager
     _THEME_AVAILABLE = True
@@ -58,6 +57,7 @@ class MarketWidget(QWidget):
         account_id=None,
     ):
         super().__init__()
+        self.chart_plugin = TradingChartPlugin()
 
         # Account
         self.account_id = account_id
@@ -283,7 +283,9 @@ class MarketWidget(QWidget):
             self.symbol_manager,
             self.app_settings,
             self.order_service,
+
         )
+        self.favorites_table.symbolSelected.connect(self._on_symbol_selected)
         try:
             self.favorites_table.show_hover_favorite = False
         except Exception:
@@ -465,14 +467,12 @@ class MarketWidget(QWidget):
         self.symbol_manager.favoritesChanged.connect(
             self._on_favorites_changed
         )
-
         self.search_dropdown.symbolSelected.connect(self._on_search_symbol_selected)
         self.search_dropdown.favoriteToggled.connect(self._on_favorite_toggled)
 
-        if self.settings_service:
-            self.settings_service.settingsChanged.connect(
-                self._on_settings_changed
-            )
+        # ← ADDED: wire all-symbols tree so clicking there also loads chart
+        if hasattr(self.all_symbols_tree, 'symbolSelected'):
+            self.all_symbols_tree.symbolSelected.connect(self._on_symbol_selected)
 
     # -------------------------
     # Tabs
@@ -553,6 +553,15 @@ class MarketWidget(QWidget):
                 print("[MarketWidget] Favorite sync failed:", e)
 
         self._update_tab_counts()
+    
+    def _on_symbol_selected(self, symbol: str):
+        """Called when user clicks a symbol in the table"""
+    
+        print("Selected symbol:", symbol)
+    
+        # Request candle data
+        if hasattr(self, "chart_plugin"):
+            self.chart_plugin.load_symbol(symbol)
 
     def _on_favorites_changed(self, favorites_list):
         self._update_tab_counts()

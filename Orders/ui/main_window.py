@@ -39,6 +39,7 @@ class OrdersWidget(QWidget):
         self.settings_btn = QPushButton("⚙")
         self.settings_btn.setObjectName("OrdersSettingsBtn")
         self.settings_btn.setFixedSize(32, 32)
+        self.settings_btn.setToolTip("Refresh orders (Order tab) / Settings (other tabs)")
         try:
             self.settings_btn.setCursor(Qt.PointingHandCursor)
         except Exception:
@@ -155,6 +156,12 @@ class OrdersWidget(QWidget):
             )
         except Exception:
             pass
+
+        # Connect button handlers
+        try:
+            self.settings_btn.clicked.connect(self._on_settings_clicked)
+        except Exception:
+            LOG.exception("Failed to connect settings button")
 
         try:
             if order_service is not None:
@@ -553,7 +560,9 @@ class OrdersWidget(QWidget):
                     LOG.info("OrdersWidget: Disconnected previous OrderUpdatesService")
                 except Exception:
                     LOG.exception("Error disconnecting previous OrderUpdatesService")
-            LOG.info("OrdersWidget: Account changed to %s, initializing OrderUpdatesService", account_id)
+            LOG.info("OrdersWidget: Account changed to %s, refreshing orders and initializing OrderUpdatesService", account_id)
+            # Refresh orders for the new account
+            self._refresh_orders()
             self._connect_order_updates(account_id)
         except Exception:
             LOG.exception("Error handling account change in OrdersWidget")
@@ -567,6 +576,9 @@ class OrdersWidget(QWidget):
                     LOG.debug("OrdersWidget: Disconnected previous OrderUpdatesService")
                 except Exception:
                     LOG.exception("Error disconnecting previous OrderUpdatesService")
+            LOG.info("OrdersWidget: Account ID changed to %s, refreshing orders and initializing OrderUpdatesService", account_id)
+            # Refresh orders for the new account
+            self._refresh_orders()
             self._connect_order_updates(account_id)
         except Exception:
             LOG.exception("Error handling account_id change in OrdersWidget")
@@ -618,6 +630,49 @@ class OrdersWidget(QWidget):
             LOG.info("OrdersWidget started OrderUpdatesService")
         except Exception:
             LOG.exception("Failed to initialize OrderUpdatesService")
+
+    def _on_settings_clicked(self):
+        """Handle settings button click - refresh orders on Order tab."""
+        try:
+            current_tab = self.tabbar.tabText(self.tabbar.currentIndex())
+            if current_tab == "Order":
+                self._refresh_orders()
+            # Could add settings dialogs for other tabs here
+        except Exception:
+            LOG.exception("Failed to handle settings button click")
+
+    def _refresh_orders(self):
+        """Manually refresh orders from the server."""
+        try:
+            LOG.info("OrdersWidget: Manual refresh of orders requested")
+            
+            # Clear existing orders
+            model = getattr(self.orders_tab, 'table').model
+            model.clear_orders()
+            
+            # Fetch fresh orders
+            if hasattr(self, 'order_service') and self.order_service:
+                orders = []
+                try:
+                    orders = self.order_service.fetch_orders()
+                except Exception:
+                    LOG.exception("Failed to fetch orders during refresh")
+                    orders = self.order_service.get_active_orders()
+                
+                for order in orders:
+                    try:
+                        model.add_order(order)
+                    except Exception:
+                        LOG.exception("Failed adding refreshed order to model: %s", order)
+                
+                LOG.info("OrdersWidget: Refreshed %s orders", len(orders))
+            
+            # Reconnect SignalR if needed
+            if self.order_updates_service is None or not self.order_updates_service.is_connected():
+                QTimer.singleShot(0, self._connect_order_updates)
+                
+        except Exception:
+            LOG.exception("Failed to refresh orders")
 
     def _on_order_updates_connection_changed(self, is_connected):
         status = "CONNECTED" if is_connected else "DISCONNECTED"
