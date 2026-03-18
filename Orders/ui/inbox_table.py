@@ -134,45 +134,67 @@ class InboxTable(QWidget):
         self._apply_theme()
         try:
             from Theme.theme_manager import ThemeManager
-            ThemeManager.instance().theme_changed.connect(
-                lambda n, t: self._apply_theme()
-            )
+            self._on_theme_cb = lambda n, t: self._apply_theme()
+            ThemeManager.instance().theme_changed.connect(self._on_theme_cb)
         except Exception:
             pass
 
+        self.setAttribute(Qt.WA_StyledBackground, True)
         self._refresh_view()
 
     # ── Theme ─────────────────────────────────────────────────────────────
     def _apply_theme(self):
+        # Use the same proven pattern as BulkCloseDialog
+        from PySide6.QtGui import QColor as _QColor
+        from PySide6.QtWidgets import QApplication as _QApp
+
+        def _detect_dark():
+            try:
+                from Theme.theme_manager import ThemeManager
+                tok = ThemeManager.instance().tokens()
+                val = tok.get("is_dark", None)
+                if val is not None:
+                    if isinstance(val, bool): return val
+                    s = str(val).lower()
+                    if s in ("true","1","yes","dark"): return True
+                    if s in ("false","0","no","light"): return False
+                for key in ("bg_panel","background","bg_primary","bg_base","bg"):
+                    cs = tok.get(key)
+                    if cs:
+                        c = _QColor(cs)
+                        if c.isValid(): return c.lightness() < 128
+            except Exception: pass
+            try:
+                app = _QApp.instance()
+                if app: return app.palette().window().color().lightness() < 128
+            except Exception: pass
+            return False
+
+        dark = _detect_dark()
         try:
             from Theme.theme_manager import ThemeManager
-            tok        = ThemeManager.instance().tokens()
-            bg         = tok.get("bg_panel",          "#ffffff")
-            bg_alt     = tok.get("bg_row_alt",         "#f9fafb")
-            text       = tok.get("text_primary",       "#111827")
-            text_sec   = tok.get("text_secondary",     "#6b7280")
-            border     = tok.get("border_separator",   "#e5e7eb")
-            accent     = tok.get("accent",             "#1976d2")
-            btn_bg     = tok.get("bg_button",          "#1976d2")
-            btn_text   = tok.get("bg_button_text",     "#ffffff")
-            bg_bar     = tok.get("bg_bottom_bar",      "#f9fafb")
-            hdr_bg     = tok.get("bg_table_header",    "#f3f4f6")
-            hdr_text   = tok.get("text_secondary",     "#6b7280")
-            sel_bg     = tok.get("bg_tab_active",      "#e6f0ff")
-            is_dark    = tok.get("is_dark", "false") == "true"
+            tok = ThemeManager.instance().tokens()
         except Exception:
-            bg, bg_alt   = "#ffffff", "#f9fafb"
-            text         = "#111827"
-            text_sec     = "#6b7280"
-            border       = "#e5e7eb"
-            accent       = "#1976d2"
-            btn_bg       = "#1976d2"
-            btn_text     = "#ffffff"
-            bg_bar       = "#f9fafb"
-            hdr_bg       = "#f3f4f6"
-            hdr_text     = "#6b7280"
-            sel_bg       = "#e6f0ff"
-            is_dark      = False
+            tok = {}
+
+        def _t(*keys, fd, fl):
+            for k in keys:
+                v = tok.get(k)
+                if v: return v
+            return fd if dark else fl
+
+        bg       = _t("bg_panel","background","bg_primary",fd="#151e2d",fl="#ffffff")
+        bg_alt   = _t("bg_row_alt","bg_secondary","bg_surface",fd="#1a2535",fl="#f9fafb")
+        bg_bar   = _t("bg_bottom_bar","bg_surface","bg_secondary",fd="#1a2535",fl="#f9fafb")
+        hdr_bg   = _t("bg_table_header","bg_secondary","bg_surface",fd="#1e2a3a",fl="#f3f4f6")
+        sel_bg   = _t("bg_tab_active","bg_selected","selection_bg",fd="#1a3a5c",fl="#e6f0ff")
+        text     = _t("text_primary","text","fg",fd="#e2e8f0",fl="#111827")
+        text_sec = _t("text_secondary","text_muted",fd="#94a3b8",fl="#6b7280")
+        border   = _t("border","border_color","border_separator","divider",fd="#2d3a4a",fl="#e5e7eb")
+        accent   = _t("accent","primary","color_accent",fd="#3b82f6",fl="#1976d2")
+        btn_bg   = accent
+        btn_text = "#ffffff"
+        hdr_text = text_sec
 
         self.view.setStyleSheet(f"""
             QTableView {{
@@ -251,7 +273,10 @@ class InboxTable(QWidget):
 
         div = self.findChild(QFrame, "inbox_divider")
         if div:
-            div.setStyleSheet(f"color: {border};")
+            div.setStyleSheet(f"background-color: {border}; border: none; max-height: 1px; min-height: 1px;")
+
+        # Outer widget bg — ensures no bleed-through from system default
+        self.setStyleSheet(f"InboxTable {{ background-color: {bg}; border: none; }}")
 
     # ── Event filter: keep "No messages" centred in the table body ────────
     def eventFilter(self, obj, event):

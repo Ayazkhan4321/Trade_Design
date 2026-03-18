@@ -156,6 +156,9 @@ class TradePanel(QWidget):
     def __init__(self, symbol, sell_price, buy_price,
                  symbol_manager=None, app_settings=None, order_service=None):
         super().__init__()
+        # Required so setStyleSheet() actually fills the widget background,
+        # covering the QTableView row colour painted behind this widget.
+        self.setAttribute(Qt.WA_StyledBackground, True)
 
         self.symbol         = symbol
         self.sell_price     = sell_price
@@ -358,21 +361,51 @@ class TradePanel(QWidget):
         else:
             t = {}
 
-        bg_widget  = t.get("bg_widget",      "#e3f2fd")
-        border_p   = t.get("border_primary",  "#90caf9")
-        text_p     = t.get("text_primary",    "#1a202c")
-        accent     = t.get("accent",          "#1976d2")
-        bg_btn     = t.get("bg_button",       "#f0f4f8")
-        bg_btn_h   = t.get("bg_button_hover", "#e2e8f0")
-        bg_input   = t.get("bg_input",        "#ffffff")
-        border_foc = t.get("border_focus",    "#1976d2")
+        # Detect dark/light for proper fallbacks
+        _dark = False
+        try:
+            val = t.get("is_dark", None)
+            if val is not None:
+                _dark = str(val).lower() in ("true", "1", "yes", "dark")
+            else:
+                from PySide6.QtGui import QColor as _QC
+                for k in ("bg_panel", "background", "bg_primary"):
+                    cs = t.get(k)
+                    if cs:
+                        _dark = _QC(cs).lightness() < 128
+                        break
+        except Exception:
+            pass
 
-        # Panel background
+        def _t(*keys, fd, fl):
+            for k in keys:
+                v = t.get(k)
+                if v: return v
+            return fd if _dark else fl
+
+        bg_widget  = _t("bg_widget", "bg_panel", "background",
+                        fd="#1e2a3a", fl="#ffffff")
+        border_p   = _t("border_primary", "border", "border_color",
+                        fd="#2d3a4a", fl="#e2e8f0")
+        text_p     = _t("text_primary", "text", "fg",
+                        fd="#e2e8f0", fl="#1a202c")
+        accent     = _t("accent", "primary", "color_accent",
+                        fd="#3b82f6", fl="#1976d2")
+        bg_btn     = _t("bg_button", "bg_input", "bg_secondary",
+                        fd="#253347", fl="#f0f4f8")
+        bg_btn_h   = _t("bg_button_hover", "bg_hover",
+                        fd="#1e2d3d", fl="#e2e8f0")
+        bg_input   = _t("bg_input", "bg_secondary", "bg_surface",
+                        fd="#1e2a3a", fl="#ffffff")
+        border_foc = _t("border_focus", "accent", "primary",
+                        fd="#3b82f6", fl="#1976d2")
+
+        # Panel background — must cover the table row behind it fully
         self.setStyleSheet(f"""
             TradePanel {{
-                background: {bg_widget};
-                border: 2px solid {border_p};
-                border-radius: 4px;
+                background-color: {bg_widget};
+                border: 1px solid {border_p};
+                border-radius: 0px;
             }}
         """)
 

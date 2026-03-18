@@ -10,6 +10,7 @@ from PySide6.QtCore import Qt, QTimer
 from .orders_tab import OrdersTab
 from .history_table import HistoryTable
 from .inbox_table import InboxTable
+from .logs_table import LogsTable
 from PySide6.QtWidgets import QLabel
 from Orders.services.order_updates_service import OrderUpdatesService
 import logging
@@ -80,7 +81,7 @@ class OrdersWidget(QWidget):
         self.orders_tab  = OrdersTab(order_service=order_service)
         self.history_tab = HistoryTable()
         self.inbox_tab   = InboxTable()
-        self.logs_tab    = QLabel("Logs Tab")
+        self.logs_tab    = LogsTable()
 
         self.stack = QStackedLayout()
         # 🟢 THE FIX: Force the stacked layout to have 0 margins

@@ -1,9 +1,9 @@
 {
-  "Entry Value": false,
-  "Swap": false,
-  "Market Value": false,
-  "Commission": false,
-  "P/L in %": false,
-  "Remarks": false,
+  "Entry Value": true,
+  "Swap": true,
+  "Market Value": true,
+  "Commission": true,
+  "P/L in %": true,
+  "Remarks": true,
   "Multi-Target SL/TP": false
 }

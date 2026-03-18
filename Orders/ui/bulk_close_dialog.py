@@ -17,19 +17,15 @@ LOG = logging.getLogger(__name__)
 from PySide6.QtWidgets import QStyledItemDelegate
 
 class _ReadOnlyCheckDelegate(QStyledItemDelegate):
-    """Draws the checkbox normally but swallows all mouse/key interaction."""
     def editorEvent(self, event, model, option, index):
-        return False  # Block every interaction — checkbox is display-only
-
+        return False
     def initStyleOption(self, option, index):
         super().initStyleOption(option, index)
-
     def paint(self, painter, option, index):
         super().paint(painter, option, index)
 
 
 class _ForbiddenCursorTable(QTableView):
-    """QTableView that shows a forbidden cursor when hovering over column 0."""
     def mouseMoveEvent(self, event):
         idx = self.indexAt(event.pos())
         if idx.isValid() and idx.column() == 0:
@@ -37,7 +33,6 @@ class _ForbiddenCursorTable(QTableView):
         else:
             self.unsetCursor()
         super().mouseMoveEvent(event)
-
     def leaveEvent(self, event):
         self.unsetCursor()
         super().leaveEvent(event)
@@ -78,11 +73,10 @@ class BulkCloseDialog(QDialog):
 
     def __init__(self, parent=None, order_service=None, model=None):
         super().__init__(parent)
-        
+
         self.setWindowFlags(Qt.Dialog | Qt.FramelessWindowHint)
         self.setAttribute(Qt.WA_TranslucentBackground, True)
-        
-        # 🟢 FIX: Widened the dialog slightly so 9 columns fit comfortably without squishing
+
         self.setWindowTitle("Bulk Close Orders")
         self.setFixedSize(680, 480)
         self.order_service = order_service
@@ -92,7 +86,7 @@ class BulkCloseDialog(QDialog):
 
         self.main_container = QFrame(self)
         self.main_container.setObjectName("MainContainer")
-        
+
         outer_layout = QVBoxLayout(self)
         outer_layout.setContentsMargins(0, 0, 0, 0)
         outer_layout.addWidget(self.main_container)
@@ -106,11 +100,11 @@ class BulkCloseDialog(QDialog):
         self.header_widget.setObjectName("HeaderWidget")
         header_layout = QHBoxLayout(self.header_widget)
         header_layout.setContentsMargins(16, 12, 16, 12)
-        
+
         icon = QLabel("\U0001F4E6")
         icon.setStyleSheet("font-size: 20px; background: transparent; color: inherit;")
         icon.setFixedWidth(28)
-        
+
         text_col = QVBoxLayout()
         text_col.setSpacing(2)
         self.title_label = QLabel("Bulk Close Orders")
@@ -119,18 +113,18 @@ class BulkCloseDialog(QDialog):
         self.subtitle.setObjectName("HeaderSubtitle")
         text_col.addWidget(self.title_label)
         text_col.addWidget(self.subtitle)
-        
+
         self.btn_x_close = QPushButton("✕")
         self.btn_x_close.setObjectName("HeaderCloseBtn")
-        self.btn_x_close.setFixedSize(30, 30) 
+        self.btn_x_close.setFixedSize(30, 30)
         self.btn_x_close.setCursor(Qt.PointingHandCursor)
         self.btn_x_close.clicked.connect(self.reject)
-        
+
         header_layout.addWidget(icon)
         header_layout.addLayout(text_col)
         header_layout.addStretch()
         header_layout.addWidget(self.btn_x_close)
-        
+
         layout.addWidget(self.header_widget)
 
         # Separator line below header
@@ -216,27 +210,21 @@ class BulkCloseDialog(QDialog):
         self.view.setSelectionBehavior(QTableView.SelectRows)
         self.view.setSelectionMode(QTableView.NoSelection)
         self.view.verticalHeader().setVisible(False)
-        
         self.view.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
 
         self.table_model = QStandardItemModel(0, 9, self)
         self.table_model.setHorizontalHeaderLabels(["", "Symbol", "ID", "Type", "Lot", "Entry", "SL", "TP", "Profit/Loss"])
         self.view.setModel(self.table_model)
         header = self.view.horizontalHeader()
-        
-        # 🟢 FIX: Smarter column distribution! 
-        # Short columns wrap tightly so they don't steal space. Only Symbol and P/L expand to fill the void.
-        header.setSectionResizeMode(0, QHeaderView.ResizeToContents) # Checkbox
-        header.setSectionResizeMode(1, QHeaderView.Stretch)          # Symbol
-        header.setSectionResizeMode(2, QHeaderView.ResizeToContents) # ID
-        header.setSectionResizeMode(3, QHeaderView.ResizeToContents) # Type
-        header.setSectionResizeMode(4, QHeaderView.ResizeToContents) # Lot
-        header.setSectionResizeMode(5, QHeaderView.ResizeToContents) # Entry
-        header.setSectionResizeMode(6, QHeaderView.ResizeToContents) # SL
-        header.setSectionResizeMode(7, QHeaderView.ResizeToContents) # TP
-        header.setSectionResizeMode(8, QHeaderView.Stretch)          # Profit/Loss
-
-        # Make per-row checkboxes display-only (not user-clickable)
+        header.setSectionResizeMode(0, QHeaderView.ResizeToContents)
+        header.setSectionResizeMode(1, QHeaderView.Stretch)
+        header.setSectionResizeMode(2, QHeaderView.ResizeToContents)
+        header.setSectionResizeMode(3, QHeaderView.ResizeToContents)
+        header.setSectionResizeMode(4, QHeaderView.ResizeToContents)
+        header.setSectionResizeMode(5, QHeaderView.ResizeToContents)
+        header.setSectionResizeMode(6, QHeaderView.ResizeToContents)
+        header.setSectionResizeMode(7, QHeaderView.ResizeToContents)
+        header.setSectionResizeMode(8, QHeaderView.Stretch)
         self.view.setItemDelegateForColumn(0, _ReadOnlyCheckDelegate(self.view))
 
         content_layout.addWidget(self.view, 1)
@@ -244,12 +232,10 @@ class BulkCloseDialog(QDialog):
         # Footer
         footer = QHBoxLayout()
         footer.setContentsMargins(0, 8, 0, 4)
-        
         self.close_btn = QPushButton("Close 0 Orders")
         self.close_btn.setObjectName("ActionBtn")
         self.close_btn.setMinimumHeight(42)
         self.close_btn.setCursor(Qt.PointingHandCursor)
-        
         footer.addWidget(self.close_btn)
         content_layout.addLayout(footer)
 
@@ -258,9 +244,12 @@ class BulkCloseDialog(QDialog):
         self.close_btn.clicked.connect(self._on_close)
 
         self._apply_theme()
+
+        # ── FIX: store lambda so GC doesn't drop the connection ──
         try:
             from Theme.theme_manager import ThemeManager
-            ThemeManager.instance().theme_changed.connect(lambda n, t: self._apply_theme())
+            self._on_theme_cb = lambda n, t: self._apply_theme()
+            ThemeManager.instance().theme_changed.connect(self._on_theme_cb)
         except Exception:
             pass
 
@@ -286,7 +275,6 @@ class BulkCloseDialog(QDialog):
     def _apply_theme(self):
         dark = _detect_dark()
 
-        # ── Pull every colour from ThemeManager tokens; fall back gracefully ──
         try:
             from Theme.theme_manager import ThemeManager
             tok = ThemeManager.instance().tokens()
@@ -321,6 +309,15 @@ class BulkCloseDialog(QDialog):
         scrollbar_bg    = _t("scrollbar_bg",    fallback_dark="#1e2a3a", fallback_light="#f1f5f9")
         scrollbar_thumb = _t("scrollbar_thumb", fallback_dark="#3d4f63", fallback_light="#cbd5e1")
         combo_drop_bg   = _t("dropdown_bg", "bg_dropdown", fallback_dark="#1e2a3a", fallback_light="#ffffff")
+
+        # Compute a slightly darker accent for hover
+        try:
+            from PySide6.QtGui import QColor as _QC
+            _c = _QC(accent); _h, _s, _v, _a = _c.getHsv()
+            _c.setHsv(_h, _s, max(0, _v - 20), _a)
+            accent_hover = _c.name()
+        except Exception:
+            accent_hover = accent
 
         self.setStyleSheet(f"""
             QDialog {{
@@ -357,9 +354,14 @@ class BulkCloseDialog(QDialog):
                 padding: 0px; margin: 0px;
             }}
             QPushButton#HeaderCloseBtn:hover {{
-                background-color: rgba(210,40,40,0.88);
-                border-color: #cc3333;
-                color: #ffffff;
+                background-color: rgba(239,68,68,0.15);
+                border-color: #ef4444;
+                color: #ef4444;
+            }}
+            QPushButton#HeaderCloseBtn:pressed {{
+                background-color: rgba(239,68,68,0.30);
+                border-color: #ef4444;
+                color: #ef4444;
             }}
             QFrame#HeaderSep {{
                 background-color: {border};
@@ -477,7 +479,7 @@ class BulkCloseDialog(QDialog):
                 width: 0px;
             }}
             QPushButton#ActionBtn {{
-                background-color: #2e7d32;
+                background-color: {accent};
                 color: #ffffff;
                 border: none;
                 border-radius: 6px;
@@ -485,11 +487,11 @@ class BulkCloseDialog(QDialog):
                 font-size: 14px;
             }}
             QPushButton#ActionBtn:hover {{
-                background-color: #388e3c;
+                background-color: {accent_hover};
             }}
             QPushButton#ActionBtn:disabled {{
-                background-color: #2e7d32;
-                color: #ffffff;
+                background-color: {border};
+                color: {text_sec};
             }}
         """)
 
@@ -513,9 +515,7 @@ class BulkCloseDialog(QDialog):
                 sym_text = str(o.get('symbol') or o.get('Symbol') or '')
                 sym = QStandardItem(sym_text)
                 sym.setEditable(False)
-                
                 sym.setTextAlignment(Qt.AlignLeft | Qt.AlignVCenter)
-                
                 oid_text = str(o.get('id') or o.get('orderId') or o.get('ID') or '')
                 oid = QStandardItem(oid_text)
                 oid.setEditable(False)
@@ -537,12 +537,8 @@ class BulkCloseDialog(QDialog):
                 pl = QStandardItem(pl_txt)
                 pl.setEditable(False)
                 self.table_model.appendRow([chk, sym, oid, typ, lot, entry, sl, tp, pl])
-                try:
-                    s = sym_text
-                    if s:
-                        seen_symbols.add(s)
-                except Exception:
-                    pass
+                if sym_text:
+                    seen_symbols.add(sym_text)
             except Exception:
                 pass
 
@@ -575,7 +571,6 @@ class BulkCloseDialog(QDialog):
         return ids
 
     def _all_visible_order_ids(self):
-        """Return IDs of all rows currently visible (not filtered out)."""
         ids = []
         for r in range(self.table_model.rowCount()):
             try:
@@ -606,12 +601,12 @@ class BulkCloseDialog(QDialog):
         profit_val = float(self.profit_val.value()) if profit_active else None
         loss_active = getattr(self, 'loss_check', None) and self.loss_check.isChecked()
         loss_val = float(self.loss_val.value()) if loss_active else None
-        
+
         for r in range(self.table_model.rowCount()):
             try:
-                sym_item = self.table_model.item(r, 1)
+                sym_item  = self.table_model.item(r, 1)
                 type_item = self.table_model.item(r, 3)
-                pl_item = self.table_model.item(r, 8)
+                pl_item   = self.table_model.item(r, 8)
                 visible = True
                 if sym and sym != "All Symbols":
                     visible = (sym_item.text() == sym)
@@ -619,14 +614,12 @@ class BulkCloseDialog(QDialog):
                     visible = (type_item.text().strip().lower() == order_type.strip().lower())
                 if visible and profit_active:
                     try:
-                        plv = float(pl_item.text())
-                        visible = (plv >= profit_val)
+                        visible = (float(pl_item.text()) >= profit_val)
                     except Exception:
                         visible = False
                 if visible and loss_active:
                     try:
-                        plv = float(pl_item.text())
-                        visible = (plv <= -abs(loss_val))
+                        visible = (float(pl_item.text()) <= -abs(loss_val))
                     except Exception:
                         visible = False
                 self.view.setRowHidden(r, not visible)
@@ -646,35 +639,29 @@ class BulkCloseDialog(QDialog):
                 itm = self.table_model.item(r, 0)
                 if itm is not None and itm.checkState() == Qt.Checked:
                     selected += 1
-                try:
-                    t = self.table_model.item(r, 3)
-                    if t is not None:
-                        types_seen.add(t.text())
-                except Exception:
-                    pass
+                t = self.table_model.item(r, 3)
+                if t is not None:
+                    types_seen.add(t.text())
             except Exception:
                 pass
-        
+
         self.count_label.setText(f"{total} ORDERS FOUND")
         label_count = selected if selected > 0 else total
-        type_label = ""
-        if len(types_seen) == 1:
-            type_label = f" {list(types_seen)[0]}"
-            
+        type_label = f" {list(types_seen)[0]}" if len(types_seen) == 1 else ""
+
         if selected == total and total > 0:
             btn_text = f"✔ Close All {label_count}{type_label} Orders"
         else:
             btn_text = f"Close {label_count}{type_label} Orders"
-            
+
         try:
             self.close_btn.setText(btn_text)
-            self.close_btn.setEnabled(total > 0)   # enabled whenever any orders exist
+            self.close_btn.setEnabled(total > 0)
         except Exception:
             pass
 
     def _on_close(self):
         ids = self._selected_order_ids()
-        # If nothing manually selected via select-all, close all visible orders
         if not ids:
             ids = self._all_visible_order_ids()
         if not ids:
@@ -696,28 +683,25 @@ class BulkCloseDialog(QDialog):
         token = session.get_token()
         if token:
             headers['Authorization'] = f"Bearer {token}"
-            
+
         try:
             LOG.debug("Posting bulk close payload: %s", payload)
-            resp = requests.post(API_ORDERS_BULK_CLOSE, json=payload, headers=headers, timeout=API_TIMEOUT, verify=API_VERIFY_TLS)
+            resp = requests.post(API_ORDERS_BULK_CLOSE, json=payload, headers=headers,
+                                 timeout=API_TIMEOUT, verify=API_VERIFY_TLS)
             LOG.info("Bulk close status: %s", getattr(resp, 'status_code', None))
-            
+
             if resp is not None and (200 <= resp.status_code < 300):
                 QMessageBox.information(self, "Success", f"Successfully closed {len(ids)} orders.")
-                
                 try:
                     if self.order_service is not None and callable(getattr(self.order_service, 'fetch_orders', None)):
                         new = self.order_service.fetch_orders()
                         if self.model is not None and hasattr(self.model, 'clear_orders'):
-                            try:
-                                self.model.clear_orders()
-                                for o in new:
-                                    try:
-                                        self.model.add_order(o)
-                                    except Exception:
-                                        pass
-                            except Exception:
-                                pass
+                            self.model.clear_orders()
+                            for o in new:
+                                try:
+                                    self.model.add_order(o)
+                                except Exception:
+                                    pass
                 except Exception:
                     LOG.exception("Failed refreshing orders after bulk close")
                 self.accept()
@@ -727,12 +711,21 @@ class BulkCloseDialog(QDialog):
                     LOG.error("Bulk close failed: %s", resp.text)
                 except Exception:
                     pass
-                QMessageBox.warning(self, "Action Failed", f"Backend rejected the request.\nStatus: {status_code}")
+                QMessageBox.warning(self, "Action Failed",
+                                    f"Backend rejected the request.\nStatus: {status_code}")
                 self.close_btn.setEnabled(True)
                 self.close_btn.setText(f"Close {len(ids)} Orders")
-                
+
         except Exception as e:
             LOG.exception("Exception while calling bulk close endpoint")
             QMessageBox.critical(self, "Error", f"Failed to connect to the server:\n{e}")
             self.close_btn.setEnabled(True)
             self.close_btn.setText(f"Close {len(ids)} Orders")
+
+    def closeEvent(self, event):
+        try:
+            from Theme.theme_manager import ThemeManager
+            ThemeManager.instance().theme_changed.disconnect(self._on_theme_cb)
+        except Exception:
+            pass
+        super().closeEvent(event)

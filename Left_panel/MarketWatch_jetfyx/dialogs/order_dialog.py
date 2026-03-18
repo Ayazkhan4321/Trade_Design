@@ -121,20 +121,22 @@ class OrderDialog(QDialog):
         self.setWindowFlags(Qt.Dialog | Qt.FramelessWindowHint)
         self.setAttribute(Qt.WA_TranslucentBackground)
 
-        self._S = 18                              # shadow padding
-        self.setFixedSize(460 + self._S * 2, 420 + self._S * 2)
+        # ── Shadow removed: _S = 0, dialog sized to content only ──────────
+        self._S = 0
+        self.setFixedSize(460, 420)
 
-        self._drag_pos = None
-        self._overlay  = None
+        self._drag_pos     = None
+        self._overlay      = None
+        self._search_dlg   = None   # SymbolSearchDialog instance
+        self._search_open  = False  # reliable toggle flag
 
         self.setup_ui(default_lot)
         self.apply_theme()
 
         if _THEME_AVAILABLE:
             try:
-                ThemeManager.instance().theme_changed.connect(
-                    lambda *_: self.apply_theme()
-                )
+                self._on_theme_cb = lambda *_: self.apply_theme()
+                ThemeManager.instance().theme_changed.connect(self._on_theme_cb)
             except Exception:
                 pass
 
@@ -170,23 +172,9 @@ class OrderDialog(QDialog):
             self._overlay = None
 
     # ------------------------------------------------------------------ #
-    # Drop-shadow paint
+    # paintEvent — shadow removed, just call super() to paint the widget
     # ------------------------------------------------------------------ #
     def paintEvent(self, event):
-        s = self._S
-        p = QPainter(self)
-        p.setRenderHint(QPainter.Antialiasing)
-        p.setPen(Qt.NoPen)
-        for i in range(s, 0, -1):
-            alpha = int(130 * (1 - i / s) ** 1.8)
-            p.setBrush(QColor(0, 0, 0, alpha))
-            p.drawRoundedRect(
-                s - i, s - i,
-                self.width()  - 2 * (s - i),
-                self.height() - 2 * (s - i),
-                11 + i * 0.3, 11 + i * 0.3
-            )
-        p.end()
         super().paintEvent(event)
 
     # ------------------------------------------------------------------ #
@@ -194,8 +182,7 @@ class OrderDialog(QDialog):
     # ------------------------------------------------------------------ #
     def mousePressEvent(self, event):
         if event.button() == Qt.LeftButton and hasattr(self, 'header_widget'):
-            hr = self.header_widget.geometry().translated(self._S, self._S)
-            if hr.contains(event.pos()):
+            if self.header_widget.geometry().contains(event.pos()):
                 self._drag_pos = event.globalPosition().toPoint()
         super().mousePressEvent(event)
 
@@ -214,9 +201,8 @@ class OrderDialog(QDialog):
     # Theme
     # ------------------------------------------------------------------ #
     def apply_theme(self):
-        s       = self._S
-        dark    = _detect_dark()
-        accent  = _accent()
+        dark   = _detect_dark()
+        accent = _accent()
 
         if dark:
             panel_bg  = "#151e2d"
@@ -242,7 +228,6 @@ class OrderDialog(QDialog):
                 background-color: {panel_bg};
                 border: 2px solid {accent};
                 border-radius: 10px;
-                margin: {s}px;
             }}
 
             QWidget#HeaderWidget  {{ background: transparent; }}
@@ -277,9 +262,9 @@ class OrderDialog(QDialog):
                 color: {accent};
             }}
 
-            /* ── Close button ── */
+            /* ── Close button — soft red hover ── */
             QPushButton#CloseBtn {{
-                background-color: {btn_bg};
+                background-color: transparent;
                 border: 1px solid {border};
                 border-radius: 4px;
                 color: {btn_color};
@@ -287,7 +272,12 @@ class OrderDialog(QDialog):
                 padding: 0px; margin: 0px;
             }}
             QPushButton#CloseBtn:hover {{
-                background-color: #fee2e2;
+                background-color: rgba(239,68,68,0.15);
+                border-color: #ef4444;
+                color: #ef4444;
+            }}
+            QPushButton#CloseBtn:pressed {{
+                background-color: rgba(239,68,68,0.30);
                 border-color: #ef4444;
                 color: #ef4444;
             }}
@@ -376,7 +366,6 @@ class OrderDialog(QDialog):
         vbox.setContentsMargins(12, 6, 12, 4)
         vbox.setSpacing(2)
 
-        # Top row: [stretch | symbol ▾ ⓘ | stretch | ✕]
         top = QHBoxLayout()
         top.setSpacing(4)
         top.addStretch()
@@ -390,7 +379,7 @@ class OrderDialog(QDialog):
         self.symbol_dropdown = QPushButton("▾")
         self.symbol_dropdown.setObjectName("HdrBtn")
         self.symbol_dropdown.setFixedSize(20, 20)
-        self.symbol_dropdown.clicked.connect(self.open_symbol_search)
+        self.symbol_dropdown.clicked.connect(self._toggle_symbol_search)
 
         self.info_btn = QPushButton("i")
         self.info_btn.setObjectName("HdrBtn")
@@ -410,7 +399,6 @@ class OrderDialog(QDialog):
         self.close_btn.clicked.connect(self.reject)
         top.addWidget(self.close_btn)
 
-        # Subtitle
         self.subtitle_label = QLabel("Majors -Euro vs US Dollar")
         self.subtitle_label.setObjectName("SubtitleLabel")
         self.subtitle_label.setAlignment(Qt.AlignCenter)
@@ -423,13 +411,65 @@ class OrderDialog(QDialog):
     # ------------------------------------------------------------------ #
     # Behaviour (unchanged)
     # ------------------------------------------------------------------ #
-    def open_symbol_search(self):
+    def _toggle_symbol_search(self):
+        """
+        Bulletproof toggle: the button is always connected to exactly ONE action.
+        Clicking ▾ → connects button to _close_symbol_search, opens dialog.
+        Clicking ▴ → closes dialog, connects button back to _toggle_symbol_search.
+        No race condition possible because the connection is swapped atomically.
+        """
         from MarketWatch_jetfyx.dialogs.symbol_search_dialog import SymbolSearchDialog
         if not self.symbol_manager:
             return
-        dialog = SymbolSearchDialog(self.symbol_manager, self)
-        dialog.symbolSelected.connect(self.change_symbol)
-        dialog.exec()
+
+        # Swap connection so the button now closes instead of opens
+        try:
+            self.symbol_dropdown.clicked.disconnect()
+        except Exception:
+            pass
+        self.symbol_dropdown.clicked.connect(self._close_symbol_search)
+        self.symbol_dropdown.setText("▴")
+
+        dlg = SymbolSearchDialog(self.symbol_manager, self)
+        dlg.symbolSelected.connect(self._on_symbol_from_search)
+        # finished fires for ALL close paths: accept, reject, Esc, X button
+        dlg.finished.connect(self._on_search_closed)
+        self._search_dlg = dlg
+        dlg.show()
+
+    def _close_symbol_search(self):
+        """Called when user clicks ▴ to manually close the search dialog."""
+        if self._search_dlg is not None:
+            try:
+                self._search_dlg.close()
+            except Exception:
+                pass
+        # Always reset — even if dialog was already closed by some other path
+        self._on_search_closed()
+
+    def _on_search_closed(self):
+        """
+        Called whenever the search dialog closes (any reason).
+        Swaps the button connection back to 'open' and resets the arrow.
+        """
+        self._search_dlg = None
+        try:
+            self.symbol_dropdown.clicked.disconnect()
+        except Exception:
+            pass
+        self.symbol_dropdown.clicked.connect(self._toggle_symbol_search)
+        try:
+            self.symbol_dropdown.setText("▾")
+        except Exception:
+            pass
+
+    def _on_symbol_from_search(self, symbol_name, sell_price, buy_price):
+        """Called when user picks a symbol; dialog closes itself after emitting."""
+        self.change_symbol(symbol_name, sell_price, buy_price)
+
+    def open_symbol_search(self):
+        """Public alias kept for backwards compatibility."""
+        self._toggle_symbol_search()
 
     def change_symbol(self, symbol_name, sell_price, buy_price):
         self.symbol = symbol_name
@@ -467,6 +507,16 @@ class OrderDialog(QDialog):
         self._remove_overlay()
         self._disconnect_price()
         return super().reject()
+
+    def closeEvent(self, event):
+        try:
+            from Theme.theme_manager import ThemeManager
+            ThemeManager.instance().theme_changed.disconnect(self._on_theme_cb)
+        except Exception:
+            pass
+        self._remove_overlay()
+        self._disconnect_price()
+        super().closeEvent(event)
 
     def handle_market_order(self, order_data):
         if self.order_service:

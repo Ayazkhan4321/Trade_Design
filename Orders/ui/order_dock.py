@@ -260,7 +260,9 @@ class OrderDock(QDockWidget):
         )
         if tabbar_ref is not None:
             try:
-                tabbar_ref.tabTextChanged.connect(lambda idx, txt: self._refresh_tab_icon(tabbar_ref, idx, txt))
+                tabbar_ref.currentChanged.connect(
+                    lambda idx: self._refresh_tab_icon(tabbar_ref, idx, tabbar_ref.tabText(idx))
+                )
             except Exception:
                 LOG.debug("tabTextChanged connect failed", exc_info=True)
 
@@ -477,7 +479,97 @@ class OrderDock(QDockWidget):
     def _open_funnel(self):
         try:
             active = self._current_tab_name()
-            if active in ("History", "Logs"):
-                QMessageBox.information(self, "Filter", f"Open filters for {active}")
+            if active not in ("Logs", "History"):
+                return
+
+            try:
+                from .logs_filter_popup import LogFilterPopup, HistoryFilterPopup
+            except ImportError:
+                from Orders.ui.logs_filter_popup import LogFilterPopup, HistoryFilterPopup
+
+            ow     = getattr(self, 'orders_widget', None)
+            anchor = getattr(ow, 'funnel_btn', None) if ow else None
+
+            if active == "Logs":
+                # ── Lazy-create Logs popup ────────────────────────────────
+                if not hasattr(self, '_log_filter_popup') or self._log_filter_popup is None:
+                    self._log_filter_popup = LogFilterPopup(parent=self)
+                    self._log_filter_popup.filters_applied.connect(self._on_log_filters_applied)
+                    self._log_filter_popup.filters_cleared.connect(self._on_log_filters_cleared)
+                popup = self._log_filter_popup
+
+            else:  # History
+                # ── Lazy-create History popup ─────────────────────────────
+                if not hasattr(self, '_history_filter_popup') or self._history_filter_popup is None:
+                    self._history_filter_popup = HistoryFilterPopup(parent=self)
+                    self._history_filter_popup.filters_applied.connect(self._on_history_filters_applied)
+                    self._history_filter_popup.filters_cleared.connect(self._on_history_filters_cleared)
+                popup = self._history_filter_popup
+
+            # Toggle
+            if popup.isVisible():
+                popup.hide()
+                return
+
+            if anchor is not None:
+                popup.show_near(anchor)
+            else:
+                popup.adjustSize()
+                geo = self.geometry()
+                popup.move(
+                    geo.x() + (geo.width()  - popup.width())  // 2,
+                    geo.y() + (geo.height() - popup.height()) // 2,
+                )
+                popup.show()
+
         except Exception:
             LOG.debug("_open_funnel failed", exc_info=True)
+
+    def _on_log_filters_applied(self, filters: dict):
+        """Called when the user clicks Apply Filters in the log filter popup."""
+        try:
+            from_date = filters.get("from_date")
+            to_date   = filters.get("to_date")
+            LOG.info("Log filters applied: from=%s to=%s", from_date, to_date)
+            ow = getattr(self, 'orders_widget', None)
+            logs_tab = getattr(ow, 'logs_tab', None) if ow else None
+            if logs_tab is not None and hasattr(logs_tab, 'apply_date_filter'):
+                logs_tab.apply_date_filter(from_date, to_date)
+        except Exception:
+            LOG.debug("_on_log_filters_applied failed", exc_info=True)
+
+    def _on_log_filters_cleared(self):
+        """Called when the user clicks Clear All in the log filter popup."""
+        try:
+            LOG.info("Log filters cleared")
+            ow = getattr(self, 'orders_widget', None)
+            logs_tab = getattr(ow, 'logs_tab', None) if ow else None
+            if logs_tab is not None and hasattr(logs_tab, 'clear_filter'):
+                logs_tab.clear_filter()
+        except Exception:
+            LOG.debug("_on_log_filters_cleared failed", exc_info=True)
+
+    def _on_history_filters_applied(self, filters: dict):
+        """Called when the user clicks Apply Filters in the history filter popup."""
+        try:
+            from_date = filters.get("from_date")
+            to_date   = filters.get("to_date")
+            ftype     = filters.get("type", "All")
+            LOG.info("History filters applied: from=%s to=%s type=%s", from_date, to_date, ftype)
+            ow = getattr(self, 'orders_widget', None)
+            history_tab = getattr(ow, 'history_tab', None) if ow else None
+            if history_tab is not None and hasattr(history_tab, 'apply_filter'):
+                history_tab.apply_filter(from_date, to_date, ftype)
+        except Exception:
+            LOG.debug("_on_history_filters_applied failed", exc_info=True)
+
+    def _on_history_filters_cleared(self):
+        """Called when the user clicks Clear All in the history filter popup."""
+        try:
+            LOG.info("History filters cleared")
+            ow = getattr(self, 'orders_widget', None)
+            history_tab = getattr(ow, 'history_tab', None) if ow else None
+            if history_tab is not None and hasattr(history_tab, 'clear_filter'):
+                history_tab.clear_filter()
+        except Exception:
+            LOG.debug("_on_history_filters_cleared failed", exc_info=True)

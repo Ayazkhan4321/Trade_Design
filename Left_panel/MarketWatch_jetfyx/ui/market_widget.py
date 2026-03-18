@@ -286,8 +286,9 @@ class MarketWidget(QWidget):
 
         )
         self.favorites_table.symbolSelected.connect(self._on_symbol_selected)
+        # show_hover_favorite = True so the ★ appears on hover in the favourites tab
         try:
-            self.favorites_table.show_hover_favorite = False
+            self.favorites_table.show_hover_favorite = True
         except Exception:
             pass
         self.favorites_table.set_advance_view(
@@ -391,9 +392,28 @@ class MarketWidget(QWidget):
         text_sel   = t.get("text_selected",  "#ffffff")
         text_hdr   = t.get("text_secondary", "#4a5568")
         border_gr  = t.get("border_separator","#e5e7eb")
-        bg_hover   = t.get("bg_row_hover",   "#e3f2fd")
         bg_alt     = t.get("bg_row_alt",     "#f9fafb")
         bg_widget  = t.get("bg_widget",      "#ffffff")
+        accent     = t.get("accent",         "#1976d2")
+        is_dark    = t.get("is_dark", "false") in ("true", "1", "True")
+
+        # Compute hover color from accent — works for any theme colour
+        # Priority: explicit bg_row_hover token → derived from accent → fallback
+        _raw_hover = t.get("bg_row_hover", "")
+        if _raw_hover and _raw_hover not in ("transparent", ""):
+            bg_hover = _raw_hover
+        else:
+            # Blend: 85% panel + 15% accent
+            try:
+                from PySide6.QtGui import QColor as _QC
+                _ac   = _QC(accent)
+                _base = _QC(bg_panel)
+                _r = int(_base.red()   * 0.92 + _ac.red()   * 0.08)
+                _g = int(_base.green() * 0.92 + _ac.green() * 0.08)
+                _b = int(_base.blue()  * 0.92 + _ac.blue()  * 0.08)
+                bg_hover = _QC(_r, _g, _b).name()
+            except Exception:
+                bg_hover = "#1e2d3d" if is_dark else "#e8f5e9"
 
         # ── Search field ──────────────────────────────────────────────
         if hasattr(self, "search"):
@@ -425,9 +445,7 @@ class MarketWidget(QWidget):
                     background: {bg_sel};
                     color: {text_sel};
                 }}
-                QTableView::item:hover {{
-                    background: {bg_hover};
-                }}
+                /* hover background handled by RowHoverDelegate / AdvanceViewDelegate */
                 QHeaderView::section {{
                     background: {bg_panel};
                     color: {text_hdr};
@@ -438,6 +456,15 @@ class MarketWidget(QWidget):
                     padding: 4px 8px;
                 }}
             """)
+            # Push computed hover color directly to delegates — bypasses all token lookup
+            try:
+                ft = self.favorites_table
+                if hasattr(ft, 'normal_delegate'):
+                    ft.normal_delegate.hover_color = bg_hover
+                if hasattr(ft, 'advance_delegate'):
+                    ft.advance_delegate.hover_color = bg_hover
+            except Exception:
+                pass
             try:
                 self.favorites_table.viewport().update()
             except Exception:

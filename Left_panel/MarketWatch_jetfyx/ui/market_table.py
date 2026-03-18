@@ -2,11 +2,12 @@ from PySide6.QtWidgets import QTableView
 from PySide6.QtWidgets import QAbstractItemView
 from PySide6.QtWidgets import QHeaderView
 from PySide6.QtCore import Signal
-from PySide6.QtCore import QRect
+from PySide6.QtCore import QRect, Qt
 from MarketWatch_jetfyx.models.market_model import MarketModel
 from MarketWatch_jetfyx.ui.trade_panel import TradePanel
 from MarketWatch_jetfyx.ui.row_hover_delegate import RowHoverDelegate
 from MarketWatch_jetfyx.ui.advance_view_delegate import AdvanceViewDelegate
+from MarketWatch_jetfyx.ui.symbol_context_menu import SymbolContextMenu   # ← NEW
 
 
 class MarketTable(QTableView):
@@ -19,41 +20,34 @@ class MarketTable(QTableView):
     # 🔄 PARTIAL UPDATE (NO REBUILD)
     # --------------------------------------------------
     def update_symbols(self, symbols: set):
-        """Update only affected rows and update TradePanel if expanded row is affected. Logs latency if timestamp is present."""
+        """Update only affected rows and update TradePanel if expanded row is affected."""
         if not symbols:
             return
 
-        # Safety check: ensure model still exists (may have been deleted if widget was destroyed)
         if not self.model or not hasattr(self.model, 'rows'):
             return
 
-        import time
         try:
             for row, row_data in enumerate(self.model.rows):
                 if not isinstance(row_data, dict):
-                    continue  # skip invalid/category rows
+                    continue
 
                 symbol = row_data.get("symbol")
                 if symbol in symbols:
-                    # Safety check before accessing model methods
                     if not self.model or not hasattr(self.model, 'columnCount'):
                         return
-                    
+
                     self.model.dataChanged.emit(
                         self.model.index(row, 0),
                         self.model.index(row, self.model.columnCount() - 1)
                     )
-                    # If this is the expanded row, update the TradePanel
                     if self.expanded_row == row:
                         panel = self.indexWidget(self.model.index(row, 0))
                         if isinstance(panel, TradePanel):
-                            # Get latest prices from row_data
                             sell = row_data.get("sell", "")
                             buy = row_data.get("buy", "")
-                            # Pass timestamp for latency logging in TradePanel
                             panel.update_prices(sell, buy, hub_received_timestamp=row_data.get('hub_received_timestamp'))
         except RuntimeError:
-            # Model was deleted while we were updating - this is safe to ignore
             pass
 
     # --------------------------------------------------
@@ -69,7 +63,6 @@ class MarketTable(QTableView):
         self.setMouseTracking(True)
         self.hovered_row = -1
 
-        # Slightly increase default row height for readability
         try:
             self.verticalHeader().setDefaultSectionSize(30)
         except Exception:
@@ -91,7 +84,6 @@ class MarketTable(QTableView):
         # View config
         self.setSelectionBehavior(QTableView.SelectRows)
         self.setSelectionMode(QTableView.SingleSelection)
-        # Prevent inline editing on single click; open TradePanel instead
         try:
             self.setEditTriggers(QAbstractItemView.NoEditTriggers)
         except Exception:
@@ -100,13 +92,114 @@ class MarketTable(QTableView):
         self.horizontalHeader().setStretchLastSection(False)
         self.setAlternatingRowColors(True)
 
-        # Make all columns stretch equally
+        # Enable custom context menu
+        self.setContextMenuPolicy(Qt.CustomContextMenu)             # ← NEW
+        self.customContextMenuRequested.connect(self._show_context_menu)  # ← NEW
+
+        # Column resize
         header = self.horizontalHeader()
-        header.setSectionResizeMode(0, QHeaderView.Stretch)  # SYMBOL
-        header.setSectionResizeMode(1, QHeaderView.Stretch)  # SELL
-        header.setSectionResizeMode(2, QHeaderView.Stretch)  # BUY
-        
+        header.setSectionResizeMode(0, QHeaderView.Stretch)
+        header.setSectionResizeMode(1, QHeaderView.Stretch)
+        header.setSectionResizeMode(2, QHeaderView.Stretch)
+
         self.clicked.connect(self.toggle_row)
+
+    # --------------------------------------------------
+    # ★  RIGHT-CLICK CONTEXT MENU  (NEW)
+    # --------------------------------------------------
+    def _show_context_menu(self, local_pos):
+        """Spawn SymbolContextMenu at the right-clicked symbol row."""
+        index = self.indexAt(local_pos)
+        if not index.isValid():
+            return
+
+        row = index.row()
+        row_data = self.model.rows[row] if 0 <= row < len(self.model.rows) else None
+        if not isinstance(row_data, dict):
+            return                          # category / separator row – skip
+
+        symbol = row_data.get("symbol", "")
+        if not symbol:
+            return
+
+        is_fav = False
+        if self.symbol_manager:
+            try:
+                is_fav = self.symbol_manager.is_favorite(symbol)
+            except Exception:
+                pass
+
+        # ── Blur the ENTIRE main window while the menu is open ──────────
+        from PySide6.QtWidgets import QGraphicsBlurEffect
+        blur_target = None
+        try:
+            # Walk up to the true top-level QMainWindow
+            top = self.window()
+            blur_effect = QGraphicsBlurEffect()
+            blur_effect.setBlurRadius(8)
+            blur_effect.setBlurHints(QGraphicsBlurEffect.PerformanceHint)
+            top.setGraphicsEffect(blur_effect)
+            blur_target = top
+        except Exception:
+            pass
+
+        SymbolContextMenu.show_for_symbol(
+            symbol      = symbol,
+            is_favorite = is_fav,
+            global_pos  = self.viewport().mapToGlobal(local_pos),
+            parent      = self,
+            on_new_order   = self._ctx_new_order,
+            on_show_chart  = self._ctx_show_chart,
+            on_symbol_info = self._ctx_symbol_info,
+            on_refresh     = self._ctx_refresh_price,
+            on_favorite    = self._ctx_toggle_favorite,
+        )
+
+        # ── Remove blur after menu closes ────────────────────────────
+        try:
+            if blur_target is not None:
+                blur_target.setGraphicsEffect(None)
+        except Exception:
+            pass
+
+    # -- handlers called by the menu ----------------------------------------
+
+    def _ctx_new_order(self, symbol: str):
+        """Open a New Order dialog / trade panel for *symbol*."""
+        # Find the row for this symbol and expand it (re-use existing logic)
+        for row, row_data in enumerate(self.model.rows):
+            if isinstance(row_data, dict) and row_data.get("symbol") == symbol:
+                self.toggle_row(self.model.index(row, 0))
+                break
+
+    def _ctx_show_chart(self, symbol: str):
+        """Emit symbolSelected so the parent window can switch the chart."""
+        self.symbolSelected.emit(symbol)
+
+    def _ctx_symbol_info(self, symbol: str):
+        """Override / connect in a subclass to show a symbol-info dialog."""
+        pass  # hook – connect externally if needed
+
+    def _ctx_refresh_price(self, symbol: str):
+        """Force a UI refresh for this symbol's row."""
+        for row, row_data in enumerate(self.model.rows):
+            if isinstance(row_data, dict) and row_data.get("symbol") == symbol:
+                self.model.dataChanged.emit(
+                    self.model.index(row, 0),
+                    self.model.index(row, self.model.columnCount() - 1)
+                )
+                break
+
+    def _ctx_toggle_favorite(self, symbol: str, new_state: bool):
+        """Toggle favourite from the context menu."""
+        try:
+            if self.symbol_manager:
+                self.symbol_manager.toggle_favorite(symbol)
+                is_fav = self.symbol_manager.is_favorite(symbol)
+                self.favoriteToggled.emit(symbol, is_fav)
+                self.viewport().update()
+        except Exception:
+            pass
 
     # --------------------------------------------------
     # VIEW MODE
@@ -117,19 +210,15 @@ class MarketTable(QTableView):
 
         self.model.set_advance_view(enabled)
         self.setItemDelegate(self.advance_delegate if enabled else self.normal_delegate)
-
-        # Use slightly larger sizes than before
         self.verticalHeader().setDefaultSectionSize(48 if enabled else 30)
-        
-        # Configure column resize modes - all columns stretch equally
+
         header = self.horizontalHeader()
-        header.setSectionResizeMode(0, QHeaderView.Stretch)  # SYMBOL
-        header.setSectionResizeMode(1, QHeaderView.Stretch)  # SELL
-        header.setSectionResizeMode(2, QHeaderView.Stretch)  # BUY
-        
+        header.setSectionResizeMode(0, QHeaderView.Stretch)
+        header.setSectionResizeMode(1, QHeaderView.Stretch)
+        header.setSectionResizeMode(2, QHeaderView.Stretch)
+
         if enabled:
-            # Advance view with TIME column
-            header.setSectionResizeMode(3, QHeaderView.Stretch)  # TIME
+            header.setSectionResizeMode(3, QHeaderView.Stretch)
 
     # --------------------------------------------------
     # DATA
@@ -152,6 +241,7 @@ class MarketTable(QTableView):
         if self.expanded_row is None:
             return
 
+        self.hovered_row = -1
         self.clearSpans()
         self.setIndexWidget(self.model.index(self.expanded_row, 0), None)
 
@@ -164,6 +254,9 @@ class MarketTable(QTableView):
         self.setRowHeight(self.expanded_row, self.verticalHeader().defaultSectionSize())
         self.expanded_row = None
         self.original_row_data = None
+        self.clearSelection()
+        self.setCurrentIndex(self.model.index(-1, -1))
+        self.viewport().update()
 
     def toggle_row(self, index):
         row = index.row()
@@ -176,30 +269,26 @@ class MarketTable(QTableView):
             return
 
         self.close_expanded_panel()
+        self.hovered_row = -1
 
         symbol = row_data.get("symbol", "")
-        sell = row_data.get("sell", "")
-        buy = row_data.get("buy", "")
+        sell   = row_data.get("sell", "")
+        buy    = row_data.get("buy", "")
 
         self.symbolSelected.emit(symbol)
-
         self.original_row_data = row_data.copy()
 
         panel = TradePanel(
-            symbol,
-            sell,
-            buy,
+            symbol, sell, buy,
             self.symbol_manager,
             self.app_settings,
             self.order_service
         )
-
         panel.closeRequested.connect(self.collapse_row)
         panel.favoriteToggled.connect(
             lambda name, status: self.favoriteToggled.emit(name, status)
         )
 
-        # Hide underlying row text (KEEP DICT)
         hidden_row = row_data.copy()
         for key in hidden_row:
             hidden_row[key] = ""
@@ -214,11 +303,10 @@ class MarketTable(QTableView):
         self.setSpan(row, 0, 1, column_count)
         self.setIndexWidget(self.model.index(row, 0), panel)
         self.setRowHeight(row, 100)
-
         self.expanded_row = row
+        self.viewport().update()
         self.clearSelection()
 
-        # Ensure focus stays on the table (prevent newly inserted widgets from stealing focus)
         try:
             self.setFocus()
         except Exception:
@@ -231,6 +319,14 @@ class MarketTable(QTableView):
     # HOVER
     # --------------------------------------------------
     def mouseMoveEvent(self, event):
+        # While a trade panel is open, suppress hover tracking entirely so
+        # hovered_row never goes stale and bleeds through on close.
+        if self.expanded_row is not None:
+            if self.hovered_row != -1:
+                self.hovered_row = -1
+                self.viewport().update()
+            return super().mouseMoveEvent(event)
+
         index = self.indexAt(event.position().toPoint())
         row = index.row() if index.isValid() else -1
 
@@ -241,7 +337,16 @@ class MarketTable(QTableView):
         super().mouseMoveEvent(event)
 
     def mousePressEvent(self, event):
-        # Detect clicks on the hover-star area and toggle favorite
+        # Right-click: open context menu directly WITHOUT calling super() so Qt
+        # never selects/highlights the row at all.
+        if event.button() == Qt.RightButton:
+            try:
+                local_pos = event.position().toPoint()
+            except Exception:
+                local_pos = event.pos()
+            self._show_context_menu(local_pos)
+            return
+
         try:
             pos = event.position().toPoint()
         except Exception:
@@ -253,49 +358,25 @@ class MarketTable(QTableView):
         if row >= 0 and row == self.hovered_row:
             symbol = self.get_symbol_at_row(row)
             if symbol:
-                # Compute visual rect for the row (column 0)
-                rect = self.visualRect(self.model.index(row, 0))
-                # Star area: 20px square placed 24px from right
-                star_w = 20
-                star_h = 20
-                star_x = rect.right() - 24
-                star_y = rect.top() + (rect.height() - star_h) // 2
-                star_rect = QRect(star_x, star_y, star_w, star_h)
-
-                if star_rect.contains(pos):
-                    # Toggle via symbol_manager if available
+                last_col = self.model.columnCount() - 1
+                rect = self.visualRect(self.model.index(row, last_col))
+                if rect.contains(pos):
                     try:
                         if getattr(self, 'symbol_manager', None):
-                            # Toggle favorite state
                             self.symbol_manager.toggle_favorite(symbol)
                             is_fav = self.symbol_manager.is_favorite(symbol)
-                            # Emit signal so MarketWidget can sync backend
                             self.favoriteToggled.emit(symbol, is_fav)
-                            # Request repaint
                             self.viewport().update()
                             return
                     except Exception:
                         pass
 
-        # If click is on a valid symbol cell (not the star), select the entire row
-        # and open the trade panel immediately without letting the view attempt
-        # to start an inline editor. This avoids showing a brief editable caret
-        # in the clicked cell. The favorites table uses this behavior.
         try:
             if row >= 0 and index.isValid():
-                # Select full row
-                try:
-                    self.selectRow(row)
-                except Exception:
-                    pass
-
-                # Open trade panel for this row (mimic clicked behavior)
                 try:
                     self.toggle_row(index)
                 except Exception:
                     pass
-
-                # Do not call base implementation to prevent default edit/start
                 return
         except Exception:
             pass

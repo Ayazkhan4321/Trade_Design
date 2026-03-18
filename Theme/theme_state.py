@@ -110,6 +110,7 @@ _CRAZY_ACCENTS: Dict[str, Dict[str, str]] = {
     "red": {
         "accent": "#e53935", "accent_hover": "#c62828",
         "bg_selected": "#c62828", "bg_tab_active": "#fce4e4",
+        "bg_row_hover": "#fdecea",          # soft red tint
         "bg_toggle_on": "#e53935", "text_tab_active": "#e53935",
         "border_focus": "#e53935", "text_link": "#e53935",
         "bg_header": "#fce4e4", "border_separator": "#f5c6c6",
@@ -118,6 +119,7 @@ _CRAZY_ACCENTS: Dict[str, Dict[str, str]] = {
     "green": {
         "accent": "#2e7d32", "accent_hover": "#1b5e20",
         "bg_selected": "#1b5e20", "bg_tab_active": "#e8f5e9",
+        "bg_row_hover": "#e8f5e9",          # soft green tint
         "bg_toggle_on": "#2e7d32", "text_tab_active": "#2e7d32",
         "border_focus": "#2e7d32", "text_link": "#2e7d32",
         "bg_header": "#e8f5e9", "border_separator": "#c8e6c9",
@@ -126,6 +128,7 @@ _CRAZY_ACCENTS: Dict[str, Dict[str, str]] = {
     "purple": {
         "accent": "#7c3aed", "accent_hover": "#5b21b6",
         "bg_selected": "#4a148c", "bg_tab_active": "#f3e5f5",
+        "bg_row_hover": "#f3e8ff",          # soft purple tint
         "bg_toggle_on": "#7c3aed", "text_tab_active": "#7c3aed",
         "border_focus": "#7c3aed", "text_link": "#7c3aed",
         "bg_header": "#f3e5f5", "border_separator": "#e1bee7",
@@ -134,6 +137,7 @@ _CRAZY_ACCENTS: Dict[str, Dict[str, str]] = {
     "orange": {
         "accent": "#f97316", "accent_hover": "#ea580c",
         "bg_selected": "#bf360c", "bg_tab_active": "#fff3e0",
+        "bg_row_hover": "#fff3e0",          # soft orange tint
         "bg_toggle_on": "#f97316", "text_tab_active": "#f97316",
         "border_focus": "#f97316", "text_link": "#f97316",
         "bg_header": "#fff3e0", "border_separator": "#ffccbc",
@@ -142,6 +146,7 @@ _CRAZY_ACCENTS: Dict[str, Dict[str, str]] = {
     "yellow": {
         "accent": "#d97706", "accent_hover": "#b45309",
         "bg_selected": "#92400e", "bg_tab_active": "#fffde7",
+        "bg_row_hover": "#fefce8",          # soft yellow tint
         "bg_toggle_on": "#d97706", "text_tab_active": "#b45309",
         "border_focus": "#d97706", "text_link": "#b45309",
         "bg_header": "#fffde7", "border_separator": "#fef08a",
@@ -150,6 +155,7 @@ _CRAZY_ACCENTS: Dict[str, Dict[str, str]] = {
     "blue": {
         "accent": "#1d4ed8", "accent_hover": "#1e3a8a",
         "bg_selected": "#1e3a8a", "bg_tab_active": "#dbeafe",
+        "bg_row_hover": "#dbeafe",          # soft blue tint
         "bg_toggle_on": "#1d4ed8", "text_tab_active": "#1d4ed8",
         "border_focus": "#1d4ed8", "text_link": "#1d4ed8",
         "bg_header": "#dbeafe", "border_separator": "#bfdbfe",
